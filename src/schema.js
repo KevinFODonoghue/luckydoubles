@@ -1,6 +1,7 @@
--- Lucky Doubles schema (Postgres). Idempotent — safe to run more than once.
--- Apply with: npm run schema   (uses DATABASE_URL)
+// Lucky Doubles schema (Postgres). Single source of truth — applied
+// automatically on boot (see db.js) and by `npm run schema`. Idempotent.
 
+const SCHEMA_SQL = `
 CREATE EXTENSION IF NOT EXISTS citext;
 
 CREATE TABLE IF NOT EXISTS users (
@@ -52,3 +53,6 @@ CREATE TABLE IF NOT EXISTS scores (
   game3 INTEGER,
   UNIQUE (week_id, user_id)
 );
+`;
+
+module.exports = { SCHEMA_SQL };

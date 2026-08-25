@@ -26,22 +26,55 @@ const pool = new Pool({
 
 pool.on('error', (err) => console.error('idle client error', err));
 
+// Apply the schema once per process before the first real query. Idempotent,
+// and serialized across concurrent cold starts with a transaction-scoped
+// advisory lock (safe under pooled/transaction-mode connections).
+const { SCHEMA_SQL } = require('./schema');
+let readyPromise = null;
+
+function ready() {
+  if (!readyPromise) {
+    readyPromise = (async () => {
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        await client.query('SELECT pg_advisory_xact_lock(727454001)');
+        await client.query(SCHEMA_SQL);
+        await client.query('COMMIT');
+      } catch (e) {
+        await client.query('ROLLBACK').catch(() => {});
+        throw e;
+      } finally {
+        client.release();
+      }
+    })().catch((e) => {
+      readyPromise = null; // retry on the next request
+      throw e;
+    });
+  }
+  return readyPromise;
+}
+
 async function q(sql, params = []) {
+  await ready();
   const result = await pool.query(sql, params);
   return result.rows;
 }
 
 async function one(sql, params = []) {
+  await ready();
   const result = await pool.query(sql, params);
   return result.rows[0];
 }
 
 async function run(sql, params = []) {
+  await ready();
   return pool.query(sql, params);
 }
 
 // Run fn inside a transaction; fn receives a client with .query().
 async function tx(fn) {
+  await ready();
   const client = await pool.connect();
   try {
     await client.query('BEGIN');

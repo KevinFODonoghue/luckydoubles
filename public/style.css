@@ -411,6 +411,11 @@ button.tag:hover { border-color: var(--ok); }
 /* ---- Admin zone ---- */
 .admin-zone h2 { color: var(--accent); }
 
+.danger-card { border-color: rgba(248, 113, 113, 0.4); }
+.danger-card h3 { color: var(--bad); }
+.btn-danger { background: rgba(248, 113, 113, 0.14); color: var(--bad); border-color: rgba(248, 113, 113, 0.45); }
+.btn-danger:hover { background: rgba(248, 113, 113, 0.22); border-color: var(--bad); }
+
 /* ---- Motion ---- */
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }

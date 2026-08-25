@@ -21,20 +21,12 @@ Environment variables:
 ## Vercel + Neon (recommended)
 
 1. **Import the repo** at vercel.com/new → `KevinFODonoghue/luckydoubles` →
-   Deploy with all defaults (framework "Other", no build step). The very first
-   deploy fails until the database exists — that's expected.
+   Deploy with all defaults (framework "Other", no build step).
 2. **Attach Neon:** project → **Storage** → **Create Database** → **Neon**
    (free plan) → connect it to the project. This injects `DATABASE_URL`.
-3. **Create the schema** (one time) from any machine:
-   ```bash
-   npm install
-   ```
-   put the `DATABASE_URL` in `.env`, then:
-   ```bash
-   npm run schema
-   ```
-4. **Redeploy** (Deployments → ⋯ → Redeploy) so the function picks up the env.
-5. Open the site, register (first account = league admin), share the link.
+3. **Redeploy** (Deployments → ⋯ → Redeploy) so the function picks up the env —
+   or just push any commit. The app creates its own schema on first boot.
+4. Open the site, register (first account = league admin), share the link.
 
 Notes:
 - `vercel.json` includes a daily cron hitting `/healthz`, which pings the
@@ -69,5 +61,7 @@ its own; for belt-and-suspenders, an occasional
 
 ## Wiping for a fresh season
 
-`npm run reset` truncates everything (first registrant becomes admin again).
-Against a remote database it requires `FORCE_SEED=1` on purpose.
+Use **Admin → Danger zone → Wipe all league data** in the app itself (type
+RESET to confirm) — no database access needed; the first registrant afterwards
+becomes admin again. From a machine with `DATABASE_URL`, `npm run reset` does
+the same (requires `FORCE_SEED=1` against a remote database, on purpose).

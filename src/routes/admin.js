@@ -187,6 +187,18 @@ router.post('/admin/users/:id/reset-password', async (req, res) => {
   util.go(res, '/admin', { msg: `Temporary password for ${target.name}: ${temp} — have them change it in Profile.` });
 });
 
+// Danger zone: wipe every table for a fresh season / go-live. Requires the
+// admin to type RESET in the confirmation box. After the wipe, the first
+// account to register becomes the new league admin.
+router.post('/admin/danger/reset', async (req, res) => {
+  if (String(req.body.confirm || '').trim().toUpperCase() !== 'RESET') {
+    return util.go(res, '/admin', { err: 'Type RESET in the confirmation box to wipe the league.' });
+  }
+  await run('TRUNCATE scores, teams, signups, weeks, users RESTART IDENTITY CASCADE');
+  req.session = null;
+  res.redirect('/register?msg=' + encodeURIComponent('League wiped clean. The first account to register becomes the new admin.'));
+});
+
 router.post('/admin/users/:id/delete', async (req, res) => {
   const target = await one('SELECT * FROM users WHERE id = $1', [util.toInt(req.params.id)]);
   if (!target) return util.go(res, '/admin', { err: 'Bowler not found.' });

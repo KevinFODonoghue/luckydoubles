@@ -1,13 +1,13 @@
-// Applies scripts/schema.sql to the database in DATABASE_URL.
-// Idempotent — safe to run more than once. Run with: npm run schema
+// Applies the schema (src/schema.js) to the database in DATABASE_URL.
+// The app also does this automatically on boot — this script exists for
+// applying it explicitly, e.g. before a first deploy. Idempotent.
+// Run with: npm run schema
 
-const fs = require('fs');
-const path = require('path');
 const { pool } = require('../src/db');
+const { SCHEMA_SQL } = require('../src/schema');
 
 async function main() {
-  const sql = fs.readFileSync(path.join(__dirname, 'schema.sql'), 'utf8');
-  await pool.query(sql);
+  await pool.query(SCHEMA_SQL);
   console.log('Schema applied.');
   await pool.end();
 }

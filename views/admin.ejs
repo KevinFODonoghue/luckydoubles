@@ -89,4 +89,18 @@
   <p class="hint">Bowlers with league history can't be deleted, to keep past results intact.</p>
 </div>
 
+<div class="card danger-card">
+  <h3>Danger zone</h3>
+  <p class="hint">Wipes <strong>everything</strong> — every bowler, week, and score — for a fresh
+  season or go-live. You'll be signed out, and the first account to register afterwards becomes
+  the new league admin. There is no undo.</p>
+  <form method="post" action="/admin/danger/reset" class="row-form"
+        data-confirm="Really wipe the ENTIRE league? Every account, week, and score will be permanently deleted.">
+    <label>Type <strong>RESET</strong> to confirm
+      <input type="text" name="confirm" autocomplete="off" placeholder="RESET">
+    </label>
+    <button type="submit" class="btn btn-danger">Wipe all league data</button>
+  </form>
+</div>
+
 <%- include('partials/footer') %>

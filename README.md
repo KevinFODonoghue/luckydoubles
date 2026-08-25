@@ -33,16 +33,11 @@ npm install
 Copy `.env.example` to `.env`, set `DATABASE_URL`, then:
 
 ```bash
-npm run schema
-```
-
-(applies `scripts/schema.sql`; safe to re-run), and:
-
-```bash
 npm start
 ```
 
-Then open http://localhost:3000.
+and open http://localhost:3000. The schema is created automatically on first
+boot (also available explicitly as `npm run schema`).
 
 ## Demo data
 
@@ -63,8 +58,9 @@ Rebuild the demo any time with `npm run seed`.
 
 ## Going live for the real league
 
-1. If demo data was seeded, wipe it: `FORCE_SEED=1 npm run reset` (on Windows
-   PowerShell: `$env:FORCE_SEED='1'; npm run reset`).
+1. If any demo or test data exists, wipe it from inside the app: **Admin →
+   Danger zone → Wipe all league data** (or `FORCE_SEED=1 npm run reset` from a
+   machine with `DATABASE_URL`).
 2. Open the site and register yourself. **The first account to register becomes
    the league admin**, so do this before sharing the link.
 3. Share the URL with the league. Everyone registers once, sets their average,
