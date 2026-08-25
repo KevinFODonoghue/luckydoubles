@@ -1,89 +1,71 @@
-const fs = require('fs');
-const path = require('path');
 const crypto = require('crypto');
+const { Pool, types } = require('pg');
 
-const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '..', 'data');
-fs.mkdirSync(DATA_DIR, { recursive: true });
-const DB_PATH = process.env.DB_PATH || path.join(DATA_DIR, 'league.db');
+// BIGINT (int8) columns come back as strings by default; every big number in
+// this app (epoch-ms timestamps, counts) fits safely in a JS number.
+types.setTypeParser(20, (v) => (v === null ? null : parseInt(v, 10)));
 
-let db;
-try {
-  const { DatabaseSync } = require('node:sqlite');
-  db = new DatabaseSync(DB_PATH);
-} catch (err) {
+const DATABASE_URL = process.env.DATABASE_URL;
+if (!DATABASE_URL) {
+  console.error('DATABASE_URL is not set. Point it at the league Postgres database (see .env.example).');
+  process.exit(1);
+}
+
+const isLocal = /localhost|127\.0\.0\.1/.test(DATABASE_URL);
+const ssl = isLocal
+  ? false
+  : (process.env.DATABASE_SSL === 'no-verify' ? { rejectUnauthorized: false } : { rejectUnauthorized: true });
+
+const pool = new Pool({
+  connectionString: DATABASE_URL,
+  ssl,
+  max: 3, // serverless: keep per-instance connections small
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 10000,
+});
+
+pool.on('error', (err) => console.error('idle client error', err));
+
+async function q(sql, params = []) {
+  const result = await pool.query(sql, params);
+  return result.rows;
+}
+
+async function one(sql, params = []) {
+  const result = await pool.query(sql, params);
+  return result.rows[0];
+}
+
+async function run(sql, params = []) {
+  return pool.query(sql, params);
+}
+
+// Run fn inside a transaction; fn receives a client with .query().
+async function tx(fn) {
+  const client = await pool.connect();
   try {
-    const Database = require('better-sqlite3');
-    db = new Database(DB_PATH);
-  } catch (err2) {
-    console.error('No SQLite driver available. Run on Node 22.13+ (built-in sqlite) or `npm install better-sqlite3`.');
-    process.exit(1);
+    await client.query('BEGIN');
+    const out = await fn(client);
+    await client.query('COMMIT');
+    return out;
+  } catch (e) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw e;
+  } finally {
+    client.release();
   }
 }
 
-db.exec('PRAGMA journal_mode = WAL');
-db.exec('PRAGMA foreign_keys = ON');
-
-db.exec(`
-CREATE TABLE IF NOT EXISTS users (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  name TEXT NOT NULL,
-  email TEXT NOT NULL COLLATE NOCASE UNIQUE,
-  password_hash TEXT NOT NULL,
-  average INTEGER,
-  is_admin INTEGER NOT NULL DEFAULT 0,
-  created_at INTEGER NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS weeks (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  date TEXT NOT NULL UNIQUE,
-  deadline INTEGER NOT NULL,
-  status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open','paired','completed')),
-  paired_at INTEGER,
-  completed_at INTEGER,
-  created_at INTEGER NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS signups (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  week_id INTEGER NOT NULL REFERENCES weeks(id) ON DELETE CASCADE,
-  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  created_at INTEGER NOT NULL,
-  paid INTEGER NOT NULL DEFAULT 0,
-  waitlisted INTEGER NOT NULL DEFAULT 0,
-  avg_snapshot INTEGER,
-  UNIQUE (week_id, user_id)
-);
-
-CREATE TABLE IF NOT EXISTS teams (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  week_id INTEGER NOT NULL REFERENCES weeks(id) ON DELETE CASCADE,
-  team_number INTEGER NOT NULL,
-  bowler1_id INTEGER NOT NULL REFERENCES users(id),
-  bowler2_id INTEGER NOT NULL REFERENCES users(id),
-  UNIQUE (week_id, team_number)
-);
-
-CREATE TABLE IF NOT EXISTS scores (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  week_id INTEGER NOT NULL REFERENCES weeks(id) ON DELETE CASCADE,
-  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  game1 INTEGER,
-  game2 INTEGER,
-  game3 INTEGER,
-  UNIQUE (week_id, user_id)
-);
-`);
-
-function sessionSecret() {
-  const file = path.join(DATA_DIR, '.session-secret');
-  try {
-    const existing = fs.readFileSync(file, 'utf8').trim();
-    if (existing) return existing;
-  } catch {}
-  const secret = crypto.randomBytes(32).toString('hex');
-  fs.writeFileSync(file, secret);
-  return secret;
+function isUniqueViolation(e) {
+  return Boolean(e) && e.code === '23505';
 }
 
-module.exports = { db, DATA_DIR, DB_PATH, sessionSecret };
+// Session-cookie signing key. Prefer an explicit SESSION_SECRET; otherwise
+// derive a stable one from the database credentials so sessions survive
+// restarts and cold starts with zero configuration.
+function sessionSecret() {
+  if (process.env.SESSION_SECRET) return process.env.SESSION_SECRET;
+  return crypto.createHash('sha256').update('luckydoubles-session|' + DATABASE_URL).digest('hex');
+}
+
+module.exports = { pool, q, one, run, tx, isUniqueViolation, sessionSecret };

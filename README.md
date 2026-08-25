@@ -23,20 +23,34 @@ outside bowling.)
 
 ## Running it
 
-Requires Node.js 22.13 or newer (uses Node's built-in SQLite — no build tools needed).
+Requires Node.js 22.13+ and a Postgres database (Neon, Supabase, or any other —
+the league's data lives there).
 
 ```bash
 npm install
+```
+
+Copy `.env.example` to `.env`, set `DATABASE_URL`, then:
+
+```bash
+npm run schema
+```
+
+(applies `scripts/schema.sql`; safe to re-run), and:
+
+```bash
 npm start
 ```
 
-Then open http://localhost:3000. Data lives in `data/league.db` (created automatically).
+Then open http://localhost:3000.
 
 ## Demo data
 
-The database currently contains a seeded demo league so you can click around:
+`npm run seed` fills the database with a demo league so you can click around:
 a completed week with full results, and an open current week with 9 signups
-(odd on purpose, so the waitlist warning is visible).
+(odd on purpose, so the waitlist warning is visible). Seeding **wipes all
+league data first** — and refuses to touch a non-local database unless you run
+it with `FORCE_SEED=1`.
 
 Sign in with any of these — the password for all of them is `demo123`:
 
@@ -49,8 +63,9 @@ Rebuild the demo any time with `npm run seed`.
 
 ## Going live for the real league
 
-1. Run `npm run reset` — this deletes the database (demo accounts included).
-2. Start the app and register yourself. **The first account to register becomes
+1. If demo data was seeded, wipe it: `FORCE_SEED=1 npm run reset` (on Windows
+   PowerShell: `$env:FORCE_SEED='1'; npm run reset`).
+2. Open the site and register yourself. **The first account to register becomes
    the league admin**, so do this before sharing the link.
 3. Share the URL with the league. Everyone registers once, sets their average,
    and opts in each week.
@@ -74,23 +89,24 @@ admin, track who's played.
 
 ## Deploying on the internet
 
-This is a plain Node + SQLite app, so it runs anywhere Node runs **with a
-persistent disk**: a VPS/droplet, or Railway/Render/Fly.io with a small volume.
-Serverless hosts (Vercel/Netlify) **cannot run it** — their read-only,
-ephemeral filesystem crashes the app on boot and couldn't keep league data
-anyway.
+Built for **Vercel + Neon Postgres** (free tiers): the repo ships a serverless
+entry (`api/index.js` + `vercel.json`), and the only required env var —
+`DATABASE_URL` — is injected automatically when you attach a Neon database to
+the Vercel project. It also still runs as a plain long-lived Node server on any
+VPS or container host pointed at the same `DATABASE_URL`.
 
-See **[deploy/DEPLOY.md](deploy/DEPLOY.md)** for step-by-step instructions
-(droplet + systemd + Caddy, or Railway/Render/Fly), including the env vars,
-health check, update procedure, and backups.
+See **[deploy/DEPLOY.md](deploy/DEPLOY.md)** for both walkthroughs, env vars,
+the health check, and backups.
 
 ## Tech notes
 
 - Node.js + Express 5, server-rendered EJS, no build step.
-- SQLite via `node:sqlite` (built into Node 22.13+); falls back to
-  `better-sqlite3` if installed on older Node.
-- Passwords hashed with bcrypt; signed session cookies; forms are same-site
-  protected; login attempts are throttled (10 tries per email per 10 minutes).
+- Postgres via `pg` (schema in `scripts/schema.sql`); works locally as a normal
+  server (`server.js`) and on Vercel as a serverless function (`api/index.js`).
+- League timezone is pinned to `America/New_York` (override with `TZ`), so
+  deadlines behave even on UTC hosts.
+- Passwords hashed with bcrypt; signed session cookies (secure-only in
+  production); forms are same-site protected; login attempts are throttled.
 - `npm run dev` restarts the server on file changes.
 
 ## Design decisions worth knowing

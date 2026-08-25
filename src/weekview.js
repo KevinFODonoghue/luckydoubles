@@ -1,50 +1,53 @@
-const { db } = require('./db');
+const { q, one, run } = require('./db');
 const util = require('./util');
 
-function getWeek(id) {
-  return db.prepare('SELECT * FROM weeks WHERE id = ?').get(id);
+async function getWeek(id) {
+  if (id === null || Number.isNaN(id)) return undefined;
+  return one('SELECT * FROM weeks WHERE id = $1', [id]);
 }
 
 // Make sure a week exists for the upcoming Friday (today counts if it's Friday).
-function ensureCurrentWeek() {
+async function ensureCurrentWeek() {
   const dateStr = util.upcomingFridayYMD();
-  let week = db.prepare('SELECT * FROM weeks WHERE date = ?').get(dateStr);
+  let week = await one('SELECT * FROM weeks WHERE date = $1', [dateStr]);
   if (!week) {
-    const res = db.prepare('INSERT INTO weeks (date, deadline, created_at) VALUES (?, ?, ?)')
-      .run(dateStr, util.defaultDeadline(dateStr), Date.now());
-    week = getWeek(Number(res.lastInsertRowid));
+    await run(
+      'INSERT INTO weeks (date, deadline, created_at) VALUES ($1, $2, $3) ON CONFLICT (date) DO NOTHING',
+      [dateStr, util.defaultDeadline(dateStr), Date.now()]
+    );
+    week = await one('SELECT * FROM weeks WHERE date = $1', [dateStr]);
   }
   return week;
 }
 
-function signupsFor(weekId) {
-  return db.prepare(`
+async function signupsFor(weekId) {
+  return q(`
     SELECT s.id, s.user_id, s.created_at, s.paid, s.waitlisted, s.avg_snapshot, u.name, u.average
     FROM signups s JOIN users u ON u.id = s.user_id
-    WHERE s.week_id = ?
+    WHERE s.week_id = $1
     ORDER BY s.created_at ASC, s.id ASC
-  `).all(weekId);
+  `, [weekId]);
 }
 
-function scoresMap(weekId) {
+async function scoresMap(weekId) {
   const map = {};
-  for (const r of db.prepare('SELECT * FROM scores WHERE week_id = ?').all(weekId)) {
+  for (const r of await q('SELECT * FROM scores WHERE week_id = $1', [weekId])) {
     map[r.user_id] = r;
   }
   return map;
 }
 
-function teamsFor(weekId) {
-  return db.prepare(`
+async function teamsFor(weekId) {
+  return q(`
     SELECT t.id, t.team_number, t.bowler1_id, t.bowler2_id,
            u1.name AS b1_name, u1.average AS b1_avg,
            u2.name AS b2_name, u2.average AS b2_avg
     FROM teams t
     JOIN users u1 ON u1.id = t.bowler1_id
     JOIN users u2 ON u2.id = t.bowler2_id
-    WHERE t.week_id = ?
+    WHERE t.week_id = $1
     ORDER BY t.team_number ASC
-  `).all(weekId);
+  `, [weekId]);
 }
 
 function canEditScores(week, viewer, targetUserId) {
@@ -54,9 +57,9 @@ function canEditScores(week, viewer, targetUserId) {
 }
 
 // Build everything the week page needs.
-function buildWeekView(week, viewer) {
+async function buildWeekView(week, viewer) {
   const now = Date.now();
-  const signups = signupsFor(week.id);
+  const signups = await signupsFor(week.id);
   const signupOpen = week.status === 'open' && now < week.deadline;
   const viewerSignup = viewer ? signups.find((s) => s.user_id === viewer.id) || null : null;
   const oddOut = signups.length % 2 === 1 ? signups[signups.length - 1] : null;
@@ -72,10 +75,10 @@ function buildWeekView(week, viewer) {
   let allScored = true;
 
   if (week.status !== 'open') {
-    const smap = scoresMap(week.id);
+    const [smap, teamRows] = await Promise.all([scoresMap(week.id), teamsFor(week.id)]);
     const gamesOf = (row) => (row ? [row.game1, row.game2, row.game3] : [null, null, null]);
 
-    const teams = teamsFor(week.id).map((t) => {
+    const teams = teamRows.map((t) => {
       const bowlers = [
         { user_id: t.bowler1_id, name: t.b1_name, avg: snapFor(t.bowler1_id, t.b1_avg), games: gamesOf(smap[t.bowler1_id]) },
         { user_id: t.bowler2_id, name: t.b2_name, avg: snapFor(t.bowler2_id, t.b2_avg), games: gamesOf(smap[t.bowler2_id]) },
@@ -136,7 +139,7 @@ function buildWeekView(week, viewer) {
   let addable = [];
   if (viewer && viewer.is_admin && week.status !== 'completed') {
     const signedIds = new Set(signups.map((s) => s.user_id));
-    addable = db.prepare('SELECT id, name, average FROM users ORDER BY name ASC').all()
+    addable = (await q('SELECT id, name, average FROM users ORDER BY name ASC'))
       .filter((u) => !signedIds.has(u.id));
   }
 
@@ -147,10 +150,10 @@ function buildWeekView(week, viewer) {
 }
 
 // Winning team names for a completed week (for the history page).
-function winnersFor(week) {
+async function winnersFor(week) {
   if (week.status !== 'completed') return null;
-  const smap = scoresMap(week.id);
-  const teams = teamsFor(week.id).map((t) => {
+  const [smap, teamRows] = await Promise.all([scoresMap(week.id), teamsFor(week.id)]);
+  const teams = teamRows.map((t) => {
     const total = [t.bowler1_id, t.bowler2_id].reduce((sum, uid) => {
       const r = smap[uid];
       return sum + (r ? (r.game1 || 0) + (r.game2 || 0) + (r.game3 || 0) : 0);

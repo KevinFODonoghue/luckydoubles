@@ -1,9 +1,9 @@
-const { db } = require('./db');
+const { q, one } = require('./db');
 
 // Season stats across all completed weeks: per bowler — nights bowled, team wins,
 // games entered, average per game, high game, high series.
-function seasonStats() {
-  const weeks = db.prepare("SELECT * FROM weeks WHERE status = 'completed' ORDER BY date ASC").all();
+async function seasonStats() {
+  const weeks = await q("SELECT * FROM weeks WHERE status = 'completed' ORDER BY date ASC");
   const perUser = new Map();
 
   const touch = (userId) => {
@@ -14,11 +14,11 @@ function seasonStats() {
   };
 
   for (const week of weeks) {
-    const teams = db.prepare('SELECT * FROM teams WHERE week_id = ?').all(week.id);
+    const teams = await q('SELECT * FROM teams WHERE week_id = $1', [week.id]);
     if (!teams.length) continue;
 
     const scores = {};
-    for (const r of db.prepare('SELECT * FROM scores WHERE week_id = ?').all(week.id)) {
+    for (const r of await q('SELECT * FROM scores WHERE week_id = $1', [week.id])) {
       scores[r.user_id] = r;
     }
 
@@ -54,7 +54,7 @@ function seasonStats() {
 
   const rows = [];
   for (const stat of perUser.values()) {
-    const user = db.prepare('SELECT name, average FROM users WHERE id = ?').get(stat.user_id);
+    const user = await one('SELECT name, average FROM users WHERE id = $1', [stat.user_id]);
     if (!user) continue;
     rows.push({
       ...stat,

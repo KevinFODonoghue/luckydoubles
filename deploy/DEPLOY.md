@@ -1,87 +1,73 @@
 # Deploying Lucky Doubles
 
-The app is a plain long-running Node process with its database in a SQLite file
-(`data/league.db`). That means it needs a host with a **persistent disk** —
-a VPS/droplet, or a managed host with a volume (Railway, Render, Fly.io).
+The app stores everything in Postgres (`DATABASE_URL`), so it runs two ways:
 
-> **Vercel / Netlify / other serverless platforms do not work.** Their
-> filesystem is read-only and nothing written to disk survives between
-> requests, so the app crashes on boot (`FUNCTION_INVOCATION_FAILED`) and even
-> a patched version would lose all league data. Don't fight it — use a host
-> with a disk.
+- **Vercel (serverless)** — the primary path. `api/index.js` + `vercel.json`
+  are already set up.
+- **Any Node host** — `server.js` runs it as a normal long-lived server on a
+  VPS, container, or Railway/Render-style host.
 
-Environment variables (all optional):
+Environment variables:
 
-| Variable | Default | Notes |
+| Variable | Required | Notes |
 | --- | --- | --- |
-| `PORT` | `3000` | Port the app listens on. |
-| `DATA_DIR` | `./data` | Where the SQLite database lives. Point at the persistent disk. |
-| `SESSION_SECRET` | auto-generated into `DATA_DIR` | Set explicitly in production so sign-ins survive rebuilds. |
-| `NODE_ENV` | – | Set to `production` behind an HTTPS proxy. This flips session cookies to secure-only — if you test over plain `http://`, leave it unset or sign-in won't stick. |
+| `DATABASE_URL` | yes | Postgres connection string. Attaching Neon to a Vercel project injects it automatically. |
+| `SESSION_SECRET` | no | Cookie signing key. If unset, a stable one is derived from `DATABASE_URL`. |
+| `TZ` | no | League timezone; defaults to `America/New_York`. |
+| `DATABASE_SSL` | no | Set to `no-verify` only if the DB host's TLS cert can't be verified. |
 
 ---
 
-## Option A — your own server (DigitalOcean droplet + Caddy)
+## Vercel + Neon (recommended)
 
-Same playbook as any small Node app. On the server:
+1. **Import the repo** at vercel.com/new → `KevinFODonoghue/luckydoubles` →
+   Deploy with all defaults (framework "Other", no build step). The very first
+   deploy fails until the database exists — that's expected.
+2. **Attach Neon:** project → **Storage** → **Create Database** → **Neon**
+   (free plan) → connect it to the project. This injects `DATABASE_URL`.
+3. **Create the schema** (one time) from any machine:
+   ```bash
+   npm install
+   ```
+   put the `DATABASE_URL` in `.env`, then:
+   ```bash
+   npm run schema
+   ```
+4. **Redeploy** (Deployments → ⋯ → Redeploy) so the function picks up the env.
+5. Open the site, register (first account = league admin), share the link.
+
+Notes:
+- `vercel.json` includes a daily cron hitting `/healthz`, which pings the
+  database — a nice uptime check on top of Neon waking automatically.
+- Neon's free tier suspends compute when idle; the first request after a quiet
+  spell takes an extra half-second while it wakes. Harmless.
+- Pushing to `main` auto-deploys.
+
+---
+
+## Any Node host (VPS / droplet / container)
+
+Same app, long-running:
 
 ```bash
-sudo mkdir -p /opt/luckydoubles && sudo chown $USER /opt/luckydoubles
 git clone https://github.com/KevinFODonoghue/luckydoubles.git /opt/luckydoubles
 cd /opt/luckydoubles && npm install --omit=dev
 ```
 
-Install the service (edit `User=`, `PORT`, and the `SESSION_SECRET` line first):
-
-```bash
-sudo cp deploy/luckydoubles.service /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable --now luckydoubles
-curl -s localhost:3100/healthz   # -> ok
-```
-
-Point a domain at the server, add the block from `deploy/Caddyfile.snippet` to
-your Caddyfile with the real domain, then `sudo systemctl reload caddy`.
-Caddy handles HTTPS automatically.
-
-**Updating** after pushing changes to GitHub:
-
-```bash
-cd /opt/luckydoubles && git pull && npm install --omit=dev
-sudo systemctl restart luckydoubles
-```
-
-**Backups:** the whole league is one file. A nightly cron line is plenty:
-
-```bash
-0 4 * * * cp /opt/luckydoubles/data/league.db /opt/luckydoubles/data/league.backup.db
-```
+Set `DATABASE_URL` (and optionally the other env vars), run `npm run schema`
+once, then use `deploy/luckydoubles.service` (systemd) and
+`deploy/Caddyfile.snippet` (HTTPS reverse proxy) — both have inline
+instructions. Health check: `GET /healthz`.
 
 ---
 
-## Option B — Railway / Render / Fly.io (managed, ~$5–7/mo)
+## Backups
 
-The shape is the same everywhere: connect the GitHub repo, attach a small
-persistent volume, point `DATA_DIR` at it.
+The league lives in Postgres now. Neon keeps point-in-time restore history on
+its own; for belt-and-suspenders, an occasional
+`pg_dump "$DATABASE_URL" > league-backup.sql` from any machine does it.
 
-**Railway:** New project → Deploy from GitHub repo. Add a **Volume** mounted at
-`/data`. Set env vars `DATA_DIR=/data`, `NODE_ENV=production`, and a
-`SESSION_SECRET`. Start command `npm start`. Generate a domain under Settings →
-Networking.
+## Wiping for a fresh season
 
-**Render:** New → Web Service from the repo. Instance type Starter. Add a
-**Disk** (1 GB) mounted at `/var/data`. Env vars `DATA_DIR=/var/data`,
-`NODE_ENV=production`, `SESSION_SECRET`. Health check path `/healthz`.
-
-**Fly.io:** `fly launch` (Node autodetected), `fly volumes create data --size 1`,
-mount it at `/data` in `fly.toml`, set `DATA_DIR=/data` and the other env vars
-with `fly secrets set`.
-
----
-
-## First run in production
-
-The database starts empty. Open the site, register yourself first — **the
-first account becomes the league admin** — then share the link with the league.
-(If you seeded demo data locally, it never leaves your machine; `data/` is
-gitignored.)
+`npm run reset` truncates everything (first registrant becomes admin again).
+Against a remote database it requires `FORCE_SEED=1` on purpose.
