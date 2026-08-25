@@ -74,11 +74,7 @@ app.use((req, res) => {
 
 app.use((err, req, res, next) => {
   console.error(err);
-  // TEMPORARY pre-launch diagnostics: expose error detail behind a token.
-  const message = req.query.debug === 'ld-debug-7431'
-    ? `[${err.code || 'no-code'}] ${err.message}`
-    : 'Something went wrong. Try again.';
-  res.status(500).render('error', { title: 'Error', code: 500, message });
+  res.status(500).render('error', { title: 'Error', code: 500, message: 'Something went wrong. Try again.' });
 });
 
 module.exports = app;
