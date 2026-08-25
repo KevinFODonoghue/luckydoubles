@@ -17,6 +17,12 @@ app.set('trust proxy', 1);
 
 app.use(express.static(path.join(__dirname, '..', 'public')));
 app.use(express.urlencoded({ extended: false }));
+// Express 5 leaves req.body undefined for bodyless requests (e.g. button-only
+// forms); normalize so routes can always read req.body.field.
+app.use((req, res, next) => {
+  if (req.body === undefined) req.body = {};
+  next();
+});
 app.use(cookieSession({
   name: 'luckydoubles',
   keys: [sessionSecret()],
