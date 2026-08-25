@@ -1,0 +1,310 @@
+<%- include('partials/header') %>
+
+<% const wk = vm.week; %>
+
+<div class="week-head">
+  <div>
+    <h1><%= h.fmtWeekDate(wk.date) %></h1>
+    <div class="sub">Lucky doubles · 3 games · signups close <%= h.fmtDT(wk.deadline) %></div>
+  </div>
+  <% if (wk.status === 'completed') { %>
+    <span class="pill pill-final">Final</span>
+  <% } else if (wk.status === 'paired') { %>
+    <span class="pill pill-paired">Pairings set</span>
+  <% } else if (vm.signupOpen) { %>
+    <span class="pill pill-open">Signups open</span>
+  <% } else { %>
+    <span class="pill pill-closed">Signups closed</span>
+  <% } %>
+</div>
+
+<ol class="stages" aria-label="Week progress">
+  <li class="stage <%= wk.status === 'open' ? 'on' : 'done' %>"><span class="dot"></span>Sign-up</li>
+  <li class="stage <%= wk.status === 'paired' ? 'on' : (wk.status === 'completed' ? 'done' : '') %>"><span class="dot"></span>Teams drawn</li>
+  <li class="stage <%= wk.status === 'completed' ? 'on' : '' %>"><span class="dot"></span>Final</li>
+</ol>
+
+<% if (user && user.is_admin) { %>
+  <% if (wk.status === 'open' && !vm.signupOpen && vm.signups.length >= 2) { %>
+  <div class="callout">
+    <div>
+      <div class="callout-big">Signups are closed — time to draw the teams</div>
+      <div class="callout-sub"><%= vm.signups.length %> bowlers in<%= vm.oddOut ? ` (odd — ${vm.oddOut.name} would sit on the waitlist)` : '' %></div>
+    </div>
+    <form method="post" action="/week/<%= wk.id %>/pair" data-confirm="Generate pairings for <%= vm.signups.length %> bowlers?">
+      <button type="submit" class="btn btn-primary btn-big">Generate pairings</button>
+    </form>
+  </div>
+  <% } else if (wk.status === 'paired' && vm.allScored && vm.standings.length) { %>
+  <div class="callout">
+    <div>
+      <div class="callout-big">Every game is in — ready to make it official?</div>
+      <div class="callout-sub">Finalizing locks the scores and crowns the winners.</div>
+    </div>
+    <form method="post" action="/week/<%= wk.id %>/finalize" data-confirm="Finalize this week? Standings become official.">
+      <button type="submit" class="btn btn-primary btn-big">Finalize week</button>
+    </form>
+  </div>
+  <% } %>
+<% } %>
+
+<% if (wk.status === 'open' && vm.signupOpen) { %>
+<div class="card countdown-card">
+  <span class="cd-label">Signups close in</span>
+  <span class="countdown" data-deadline="<%= wk.deadline %>"><%= h.remainingText(wk.deadline) %></span>
+</div>
+<% } %>
+
+<%# ---------- Your panel ---------- %>
+<% if (wk.status === 'open') { %>
+  <% if (vm.viewerSignup) { %>
+    <div class="card you-card">
+      <div class="you-main">
+        <div class="you-big">You're in! 🎳</div>
+        <div class="you-sub">
+          Spot #<%= vm.signups.findIndex(s => s.user_id === user.id) + 1 %> of <%= vm.signups.length %>
+          · <%= vm.viewerSignup.paid ? 'Paid ✓' : 'Pay at the desk' %>
+        </div>
+      </div>
+      <% if (vm.signupOpen) { %>
+      <form method="post" action="/week/<%= wk.id %>/optout">
+        <button type="submit" class="btn btn-ghost">Opt out</button>
+      </form>
+      <% } %>
+    </div>
+  <% } else if (vm.signupOpen) { %>
+    <% if (user.average === null) { %>
+      <div class="card you-card">
+        <div class="you-main">
+          <div class="you-big">Want in this week?</div>
+          <div class="you-sub">Drop in your average and you're signed up — teams are drawn from it.</div>
+        </div>
+        <form method="post" action="/week/<%= wk.id %>/optin" class="avg-inline">
+          <input type="number" name="average" min="0" max="300" inputmode="numeric" placeholder="Your avg" required aria-label="Your bowling average">
+          <button type="submit" class="btn btn-primary">Save &amp; sign up</button>
+        </form>
+      </div>
+    <% } else { %>
+      <div class="card you-card">
+        <div class="you-main">
+          <div class="you-big">Bowling this week?</div>
+          <div class="you-sub">Your average: <%= user.average %> · you can opt back out until the deadline</div>
+        </div>
+        <form method="post" action="/week/<%= wk.id %>/optin">
+          <button type="submit" class="btn btn-primary btn-big">I'm in for Friday</button>
+        </form>
+      </div>
+    <% } %>
+  <% } else { %>
+    <div class="card you-card">
+      <div class="you-main">
+        <div class="you-big"><%= vm.viewerSignup ? 'Signups are closed' : "You're not in this week" %></div>
+        <div class="you-sub">Waiting on the admin to generate pairings.</div>
+      </div>
+    </div>
+  <% } %>
+<% } else { %>
+  <% if (vm.viewerTeam) { %>
+    <% const teammate = vm.viewerTeam.bowlers.find(b => b.user_id !== user.id); %>
+    <div class="card you-card you-team">
+      <div class="you-main">
+        <div class="you-big">Your teammate: <%= teammate.name %> <span class="dim">(avg <%= teammate.avg %>)</span></div>
+        <div class="you-sub">
+          Team <%= vm.viewerTeam.number %>
+          <% if (wk.status === 'completed') { %>
+            · finished #<%= vm.viewerTeam.rank %> with <%= h.fmtNum(vm.viewerTeam.total) %> pins
+          <% } else { %>
+            · combined average <%= h.fmtNum(vm.viewerTeam.combinedAvg) %>
+          <% } %>
+        </div>
+      </div>
+      <% if (wk.status !== 'completed') { %>
+      <a href="#team-<%= vm.viewerTeam.number %>" class="btn btn-primary">Enter my scores</a>
+      <% } %>
+    </div>
+  <% } else if (vm.viewerSignup && vm.viewerSignup.waitlisted) { %>
+    <div class="card you-card you-wait">
+      <div class="you-main">
+        <div class="you-big">You're on the waitlist</div>
+        <div class="you-sub">Odd number of bowlers this week and you signed up last. You're first in if someone drops.</div>
+      </div>
+    </div>
+  <% } else if (user) { %>
+    <div class="card you-card">
+      <div class="you-main">
+        <div class="you-big">You're not bowling this week</div>
+        <div class="you-sub">Check out the matchups below<%= wk.status === 'completed' ? ' and the final results.' : '.' %></div>
+      </div>
+    </div>
+  <% } %>
+<% } %>
+
+<%# ---------- Standings ---------- %>
+<% if (wk.status !== 'open' && vm.standings.length) { %>
+  <% if (wk.status === 'completed') { %>
+    <% const champs = vm.standings.filter(t => t.rank === 1); %>
+    <% if (champs.length && champs[0].total > 0) { %>
+    <div class="winner-banner">
+      🏆 <strong><%= champs.map(t => t.bowlers.map(b => b.name).join(' & ')).join(', ') %></strong>
+      <span>win with <%= h.fmtNum(champs[0].total) %> pins</span>
+    </div>
+    <% } %>
+  <% } %>
+
+  <section>
+    <h2><%= wk.status === 'completed' ? 'Final standings' : 'Matchups & scores' %></h2>
+    <div class="standings">
+      <% vm.standings.forEach(t => { %>
+      <div class="team-card <%= wk.status === 'completed' && t.rank === 1 ? 'winner' : '' %>" id="team-<%= t.number %>">
+        <div class="rankbox">
+          <div class="rank"><%= wk.status === 'completed' && t.rank === 1 && t.total > 0 ? '🏆' : '#' + t.rank %></div>
+          <div class="tnum">Team <%= t.number %></div>
+        </div>
+        <div class="team-body">
+          <% t.bowlers.forEach(b => { %>
+          <form method="post" action="/week/<%= wk.id %>/scores/<%= b.user_id %>" class="bowler-row <%= user && b.user_id === user.id && b.canEdit ? 'me-row' : '' %>">
+            <span class="bname">
+              <%= b.name %><% if (user && b.user_id === user.id) { %> <span class="you">you</span><% } %>
+              <span class="bavg">avg <%= b.avg %></span>
+            </span>
+            <% if (b.canEdit) { %>
+              <span class="games">
+                <input name="game1" type="number" min="0" max="300" inputmode="numeric" placeholder="G1" aria-label="<%= b.name %> game 1" value="<%= b.games[0] === null ? '' : b.games[0] %>">
+                <input name="game2" type="number" min="0" max="300" inputmode="numeric" placeholder="G2" aria-label="<%= b.name %> game 2" value="<%= b.games[1] === null ? '' : b.games[1] %>">
+                <input name="game3" type="number" min="0" max="300" inputmode="numeric" placeholder="G3" aria-label="<%= b.name %> game 3" value="<%= b.games[2] === null ? '' : b.games[2] %>">
+              </span>
+              <span class="series"><%= b.hasAny ? h.fmtNum(b.series) : '—' %></span>
+              <button type="submit" class="btn btn-sm">Save</button>
+            <% } else { %>
+              <span class="games ro">
+                <span class="g"><%= b.games[0] === null ? '·' : b.games[0] %></span>
+                <span class="g"><%= b.games[1] === null ? '·' : b.games[1] %></span>
+                <span class="g"><%= b.games[2] === null ? '·' : b.games[2] %></span>
+              </span>
+              <span class="series"><%= b.hasAny ? h.fmtNum(b.series) : '—' %></span>
+            <% } %>
+          </form>
+          <% }) %>
+        </div>
+        <div class="team-total">
+          <div class="tt"><%= h.fmtNum(t.total) %></div>
+          <div class="ttl">pins</div>
+          <% if (!t.complete) { %><div class="ttinc"><%= t.gamesEntered %>/6 games</div><% } %>
+        </div>
+      </div>
+      <% }) %>
+    </div>
+
+    <% if (vm.highlights) { %>
+    <div class="highlights">
+      <span>🔥 High game: <strong><%= vm.highlights.highGame.name %> — <%= vm.highlights.highGame.pins %></strong></span>
+      <span>💪 High series: <strong><%= vm.highlights.highSeries.name %> — <%= h.fmtNum(vm.highlights.highSeries.pins) %></strong></span>
+    </div>
+    <% } %>
+
+    <% if (vm.waitlist.length) { %>
+    <div class="card wait-card">
+      ⏳ Waitlist: <strong><%= vm.waitlist.map(s => s.name).join(', ') %></strong>
+      <span class="dim">(last to sign up — first in if someone drops)</span>
+    </div>
+    <% } %>
+  </section>
+<% } %>
+
+<%# ---------- Roster ---------- %>
+<section>
+  <h2>Bowlers <span class="count"><%= vm.signups.length %></span>
+    <% if (user && user.is_admin && vm.signups.length) { %>
+    <span class="paid-chip"><%= vm.signups.filter(s => s.paid).length %>/<%= vm.signups.length %> paid</span>
+    <% } %>
+  </h2>
+
+  <% if (wk.status === 'open' && vm.oddOut && vm.signups.length >= 3) { %>
+  <div class="notice">
+    Odd number of bowlers — if it stays this way, <strong><%= vm.oddOut.name %></strong> (last to sign up) goes on the waitlist.
+  </div>
+  <% } %>
+
+  <% if (vm.signups.length === 0) { %>
+    <p class="empty">Nobody has signed up yet<%= vm.signupOpen ? ' — be the first!' : '.' %></p>
+  <% } else { %>
+  <ul class="roster">
+    <% vm.signups.forEach((s, i) => { %>
+    <li class="roster-row <%= user && s.user_id === user.id ? 'me' : '' %>">
+      <span class="ord">#<%= i + 1 %></span>
+      <span class="rname"><%= s.name %><% if (user && s.user_id === user.id) { %> <span class="you">you</span><% } %></span>
+      <span class="ravg">avg <%= s.avg_snapshot !== null ? s.avg_snapshot : (s.average === null ? '—' : s.average) %></span>
+      <% if (wk.status !== 'open' && s.waitlisted) { %><span class="tag tag-warn">waitlist</span><% } %>
+      <% if (user && user.is_admin) { %>
+        <form method="post" action="/signups/<%= s.id %>/paid" class="inline">
+          <button type="submit" class="tag <%= s.paid ? 'tag-ok' : 'tag-dim' %>" title="Click to toggle paid"><%= s.paid ? 'Paid ✓' : 'Unpaid' %></button>
+        </form>
+        <% if (wk.status !== 'completed') { %>
+        <form method="post" action="/signups/<%= s.id %>/remove" class="inline" data-confirm="Remove <%= s.name %> from this week?">
+          <button type="submit" class="xbtn" title="Remove from this week">✕</button>
+        </form>
+        <% } %>
+      <% } else if (user && s.user_id === user.id) { %>
+        <span class="tag <%= s.paid ? 'tag-ok' : 'tag-dim' %>"><%= s.paid ? 'Paid ✓' : 'Pay at desk' %></span>
+      <% } %>
+    </li>
+    <% }) %>
+  </ul>
+  <% } %>
+
+  <% if (user && user.is_admin && wk.status !== 'completed' && vm.addable.length) { %>
+  <form method="post" action="/week/<%= wk.id %>/signups/add" class="row-form">
+    <select name="user_id">
+      <% vm.addable.forEach(u => { %>
+      <option value="<%= u.id %>"><%= u.name %> (<%= u.average === null ? 'no avg' : 'avg ' + u.average %>)</option>
+      <% }) %>
+    </select>
+    <button type="submit" class="btn btn-sm">Add bowler</button>
+  </form>
+  <% } %>
+</section>
+
+<%# ---------- Admin controls ---------- %>
+<% if (user && user.is_admin) { %>
+<section class="admin-zone">
+  <h2>Admin controls</h2>
+  <div class="card">
+    <div class="btn-row">
+      <% if (wk.status === 'open') { %>
+        <form method="post" action="/week/<%= wk.id %>/pair"
+              data-confirm="<%= vm.signupOpen ? 'Signups are still open — generate pairings now?' : 'Generate pairings for ' + vm.signups.length + ' bowlers?' %>">
+          <button type="submit" class="btn btn-primary">Generate pairings</button>
+        </form>
+      <% } else if (wk.status === 'paired') { %>
+        <form method="post" action="/week/<%= wk.id %>/pair"
+              data-confirm="Re-shuffle all pairings? Individual game scores are kept.">
+          <button type="submit" class="btn">Regenerate pairings</button>
+        </form>
+        <form method="post" action="/week/<%= wk.id %>/finalize"
+              data-confirm="<%= vm.allScored ? 'Finalize this week? Standings become official.' : 'Not all games are entered yet. Finalize anyway?' %>">
+          <button type="submit" class="btn btn-primary">Finalize week</button>
+        </form>
+        <form method="post" action="/week/<%= wk.id %>/reopen"
+              data-confirm="Reopen signups? Pairings will be cleared (scores are kept).">
+          <button type="submit" class="btn btn-ghost">Reopen signups</button>
+        </form>
+      <% } else { %>
+        <form method="post" action="/week/<%= wk.id %>/unfinalize"
+              data-confirm="Unlock this week so scores can be edited?">
+          <button type="submit" class="btn btn-ghost">Unlock week</button>
+        </form>
+      <% } %>
+    </div>
+    <% if (wk.status !== 'completed') { %>
+    <form method="post" action="/week/<%= wk.id %>/deadline" class="row-form deadline-form">
+      <label>Signup deadline
+        <input type="datetime-local" name="deadline" value="<%= h.toLocalInputValue(wk.deadline) %>">
+      </label>
+      <button type="submit" class="btn btn-sm">Update</button>
+    </form>
+    <% } %>
+  </div>
+</section>
+<% } %>
+
+<%- include('partials/footer') %>

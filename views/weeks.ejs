@@ -1,0 +1,31 @@
+<%- include('partials/header') %>
+
+<div class="week-head">
+  <div>
+    <h1>League history</h1>
+    <div class="sub">Every Friday night, newest first</div>
+  </div>
+</div>
+
+<div class="history">
+  <% weeks.forEach(w => { %>
+  <a class="card hist-card hist-<%= w.status %>" href="/week/<%= w.id %>">
+    <div class="hist-main">
+      <div class="hist-date"><%= h.fmtWeekDate(w.date) %><% if (w.isCurrent) { %> <span class="tag tag-ok">this week</span><% } %></div>
+      <div class="hist-sub">
+        <%= w.bowlerCount %> bowler<%= w.bowlerCount === 1 ? '' : 's' %>
+        <% if (w.winners) { %> · 🏆 <%= w.winners.names %> — <%= h.fmtNum(w.winners.total) %> pins<% } %>
+      </div>
+    </div>
+    <% if (w.status === 'completed') { %>
+      <span class="pill pill-final">Final</span>
+    <% } else if (w.status === 'paired') { %>
+      <span class="pill pill-paired">In play</span>
+    <% } else { %>
+      <span class="pill pill-open">Open</span>
+    <% } %>
+  </a>
+  <% }) %>
+</div>
+
+<%- include('partials/footer') %>

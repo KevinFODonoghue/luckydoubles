@@ -1,0 +1,20 @@
+<%- include('partials/header') %>
+
+<div class="lane-glow" aria-hidden="true"></div>
+<div class="auth-card card">
+  <div class="auth-logo">🎳</div>
+  <h1 class="auth-title">Friday Night<br><span class="lucky">Lucky Doubles</span></h1>
+  <p class="auth-sub">Sign in to opt in for this week.</p>
+  <form method="post" action="/login" class="stack">
+    <label>Email
+      <input type="email" name="email" required autocomplete="email" autofocus>
+    </label>
+    <label>Password
+      <input type="password" name="password" required autocomplete="current-password">
+    </label>
+    <button type="submit" class="btn btn-primary btn-block">Sign in</button>
+  </form>
+  <p class="auth-alt">New to the league? <a href="/register">Create an account</a></p>
+</div>
+
+<%- include('partials/footer') %>

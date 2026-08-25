@@ -1,0 +1,21 @@
+{
+  "name": "luckydoubles",
+  "version": "1.0.0",
+  "description": "Friday night lucky-draw doubles bowling league — signups, pairings, scores, results",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "seed": "node scripts/seed-demo.js",
+    "reset": "node scripts/reset.js"
+  },
+  "engines": {
+    "node": ">=22.13"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.2",
+    "cookie-session": "^2.1.0",
+    "ejs": "^3.1.10",
+    "express": "^5.1.0"
+  }
+}

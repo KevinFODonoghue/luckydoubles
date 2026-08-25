@@ -1,0 +1,46 @@
+<%- include('partials/header') %>
+
+<div class="week-head">
+  <div>
+    <h1>Season stats</h1>
+    <div class="sub"><%= completedWeeks %> finished night<%= completedWeeks === 1 ? '' : 's' %> · wins, big games, bragging rights</div>
+  </div>
+</div>
+
+<% if (!rows.length) { %>
+<div class="card">
+  <p class="empty">No finished weeks yet — stats show up once the first night is finalized.</p>
+</div>
+<% } else { %>
+<div class="card">
+  <div class="table-scroll">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Bowler</th>
+          <th>Wins</th>
+          <th>Nights</th>
+          <th>Avg/game</th>
+          <th>High game</th>
+          <th>High series</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% rows.forEach((r, i) => { %>
+        <tr class="<%= i === 0 && r.wins > 0 ? 'stat-top' : '' %>">
+          <td class="stat-name"><%= i === 0 && r.wins > 0 ? '🏆 ' : '' %><%= r.name %><% if (user && r.user_id === user.id) { %> <span class="you">you</span><% } %></td>
+          <td><%= r.wins %></td>
+          <td><%= r.nights %></td>
+          <td><%= r.avgPerGame === null ? '—' : r.avgPerGame %></td>
+          <td><%= r.highGame || '—' %></td>
+          <td><%= r.highSeries ? h.fmtNum(r.highSeries) : '—' %></td>
+        </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+  <p class="hint">A win means your team had the top total for the night. Avg/game counts only games actually entered.</p>
+</div>
+<% } %>
+
+<%- include('partials/footer') %>

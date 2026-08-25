@@ -1,0 +1,92 @@
+<%- include('partials/header') %>
+
+<div class="week-head">
+  <div>
+    <h1>League admin</h1>
+    <div class="sub">Weeks, bowlers, payments</div>
+  </div>
+</div>
+
+<div class="card">
+  <h3>Weeks</h3>
+  <div class="table-scroll">
+    <table class="table">
+      <thead>
+        <tr><th>Date</th><th>Status</th><th>Bowlers</th><th></th></tr>
+      </thead>
+      <tbody>
+        <% weeks.forEach(w => { %>
+        <tr>
+          <td><a href="/week/<%= w.id %>"><%= h.fmtShortDate(w.date) %></a></td>
+          <td>
+            <% if (w.status === 'completed') { %><span class="pill pill-final">Final</span>
+            <% } else if (w.status === 'paired') { %><span class="pill pill-paired">In play</span>
+            <% } else { %><span class="pill pill-open">Open</span><% } %>
+          </td>
+          <td><%= w.bowlerCount %></td>
+          <td class="t-actions">
+            <form method="post" action="/admin/weeks/<%= w.id %>/delete" class="inline"
+                  data-confirm="Delete the week of <%= h.fmtShortDate(w.date) %>? All signups and scores for it are permanently removed.">
+              <button type="submit" class="xbtn" title="Delete week">✕</button>
+            </form>
+          </td>
+        </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+  <form method="post" action="/admin/weeks" class="row-form">
+    <label>Date <input type="date" name="date" required></label>
+    <label>Deadline <span class="hint">(optional, defaults to 6:30 PM)</span>
+      <input type="datetime-local" name="deadline">
+    </label>
+    <button type="submit" class="btn btn-sm">Create week</button>
+  </form>
+  <p class="hint">The upcoming Friday is created automatically — you only need this for special dates.</p>
+</div>
+
+<div class="card">
+  <h3>Bowlers</h3>
+  <div class="table-scroll">
+    <table class="table">
+      <thead>
+        <tr><th>Name</th><th>Email</th><th>Average</th><th>Weeks</th><th></th></tr>
+      </thead>
+      <tbody>
+        <% users.forEach(u => { %>
+        <tr>
+          <td><%= u.name %><% if (u.is_admin) { %> <span class="tag tag-ok">admin</span><% } %></td>
+          <td class="dim"><%= u.email %></td>
+          <td>
+            <form method="post" action="/admin/users/<%= u.id %>/average" class="inline avg-form">
+              <input type="number" name="average" min="0" max="300" inputmode="numeric"
+                     value="<%= u.average === null ? '' : u.average %>" placeholder="—">
+              <button type="submit" class="btn btn-xs">Set</button>
+            </form>
+          </td>
+          <td><%= u.signup_count %></td>
+          <td class="t-actions">
+            <form method="post" action="/admin/users/<%= u.id %>/reset-password" class="inline"
+                  data-confirm="Reset <%= u.name %>'s password? A temporary one will be shown to you.">
+              <button type="submit" class="btn btn-xs">Reset pw</button>
+            </form>
+            <form method="post" action="/admin/users/<%= u.id %>/toggle-admin" class="inline"
+                  data-confirm="<%= u.is_admin ? 'Remove admin access from ' + u.name + '?' : 'Make ' + u.name + ' an admin?' %>">
+              <button type="submit" class="btn btn-xs"><%= u.is_admin ? 'Demote' : 'Make admin' %></button>
+            </form>
+            <% if (u.signup_count === 0 && u.id !== user.id) { %>
+            <form method="post" action="/admin/users/<%= u.id %>/delete" class="inline"
+                  data-confirm="Delete <%= u.name %>'s account?">
+              <button type="submit" class="xbtn" title="Delete account">✕</button>
+            </form>
+            <% } %>
+          </td>
+        </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+  <p class="hint">Bowlers with league history can't be deleted, to keep past results intact.</p>
+</div>
+
+<%- include('partials/footer') %>

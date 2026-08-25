@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title><%= title %> · Lucky Doubles</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎳</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<nav class="nav">
+  <div class="nav-inner">
+    <a class="brand" href="/">🎳 <span>Lucky Doubles</span></a>
+    <% if (user) { %>
+    <div class="nav-links">
+      <a href="/" class="<%= active === 'week' ? 'on' : '' %>">This Week</a>
+      <a href="/weeks" class="<%= active === 'weeks' ? 'on' : '' %>">History</a>
+      <a href="/stats" class="<%= active === 'stats' ? 'on' : '' %>">Stats</a>
+      <a href="/profile" class="<%= active === 'profile' ? 'on' : '' %>">Profile</a>
+      <% if (user.is_admin) { %><a href="/admin" class="<%= active === 'admin' ? 'on' : '' %>">Admin</a><% } %>
+      <form method="post" action="/logout" class="inline"><button type="submit" class="linkbtn">Sign out</button></form>
+    </div>
+    <% } %>
+  </div>
+</nav>
+<main class="wrap">
+<% if (msg) { %><div class="flash flash-ok"><%= msg %></div><% } %>
+<% if (err) { %><div class="flash flash-err"><%= err %></div><% } %>

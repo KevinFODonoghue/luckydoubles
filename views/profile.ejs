@@ -1,0 +1,37 @@
+<%- include('partials/header') %>
+
+<div class="week-head">
+  <div>
+    <h1>Your profile</h1>
+    <div class="sub">Signed in as <%= user.email %></div>
+  </div>
+</div>
+
+<div class="card">
+  <h3>Bowling details</h3>
+  <form method="post" action="/profile/details" class="stack">
+    <label>Display name
+      <input type="text" name="name" value="<%= user.name %>" required maxlength="60">
+    </label>
+    <label>Your average <span class="hint">(whole number, 0–300 — used to build the doubles teams)</span>
+      <input type="number" name="average" min="0" max="300" inputmode="numeric"
+             value="<%= user.average === null ? '' : user.average %>" placeholder="e.g. 145">
+    </label>
+    <button type="submit" class="btn btn-primary">Save</button>
+  </form>
+</div>
+
+<div class="card">
+  <h3>Change password</h3>
+  <form method="post" action="/profile/password" class="stack">
+    <label>Current password
+      <input type="password" name="current" required autocomplete="current-password">
+    </label>
+    <label>New password <span class="hint">(6+ characters)</span>
+      <input type="password" name="password" required minlength="6" autocomplete="new-password">
+    </label>
+    <button type="submit" class="btn">Update password</button>
+  </form>
+</div>
+
+<%- include('partials/footer') %>
