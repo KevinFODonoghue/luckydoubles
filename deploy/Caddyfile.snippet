@@ -1,0 +1,7 @@
+# Add this block to your existing Caddyfile (usually /etc/caddy/Caddyfile),
+# swap in the real domain, then: sudo systemctl reload caddy
+# Caddy fetches the HTTPS certificate automatically.
+
+luckydoubles.example.com {
+    reverse_proxy 127.0.0.1:3100
+}

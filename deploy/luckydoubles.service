@@ -1,0 +1,26 @@
+# systemd unit for Lucky Doubles.
+# Copy to /etc/systemd/system/luckydoubles.service, adjust User/paths/port,
+# then: sudo systemctl daemon-reload && sudo systemctl enable --now luckydoubles
+
+[Unit]
+Description=Lucky Doubles bowling league app
+After=network.target
+
+[Service]
+Type=simple
+# Run as a normal unprivileged user that owns /opt/luckydoubles
+User=deploy
+WorkingDirectory=/opt/luckydoubles
+ExecStart=/usr/bin/node server.js
+Restart=always
+RestartSec=3
+Environment=NODE_ENV=production
+# Pick a port that's free on your server (Caddy proxies to it)
+Environment=PORT=3100
+# Optional but recommended: pin the session secret so sign-ins survive
+# moving/rebuilding the server. Any long random string works:
+#   openssl rand -hex 32
+# Environment=SESSION_SECRET=change-me
+
+[Install]
+WantedBy=multi-user.target

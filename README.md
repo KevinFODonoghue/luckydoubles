@@ -74,11 +74,15 @@ admin, track who's played.
 
 ## Deploying on the internet
 
-This is a plain Node + SQLite app, so it runs anywhere Node runs. Good fits:
-Railway, Render, or Fly.io with a **persistent volume mounted at `data/`**
-(that's the entire database). Set `SESSION_SECRET` to any long random string in
-production. It is not a fit for serverless hosts (Vercel/Netlify) because the
-SQLite file needs a disk that sticks around.
+This is a plain Node + SQLite app, so it runs anywhere Node runs **with a
+persistent disk**: a VPS/droplet, or Railway/Render/Fly.io with a small volume.
+Serverless hosts (Vercel/Netlify) **cannot run it** — their read-only,
+ephemeral filesystem crashes the app on boot and couldn't keep league data
+anyway.
+
+See **[deploy/DEPLOY.md](deploy/DEPLOY.md)** for step-by-step instructions
+(droplet + systemd + Caddy, or Railway/Render/Fly), including the env vars,
+health check, update procedure, and backups.
 
 ## Tech notes
 

@@ -20,7 +20,12 @@ app.use(cookieSession({
   maxAge: 1000 * 60 * 60 * 24 * 90,
   sameSite: 'lax',
   httpOnly: true,
+  // In production the app should sit behind an HTTPS proxy (Caddy/Render/etc.)
+  secure: process.env.NODE_ENV === 'production',
 }));
+
+// Unauthenticated health check for uptime monitors and host health probes.
+app.get('/healthz', (req, res) => res.type('text').send('ok'));
 
 // Load the signed-in user and set template defaults.
 app.use((req, res, next) => {
