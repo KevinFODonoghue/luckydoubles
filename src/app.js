@@ -1,6 +1,7 @@
-// League nights are US Eastern; pin the timezone so date math and display are
-// right even when the host runs in UTC (e.g. Vercel). Must run before any Date use.
-process.env.TZ = process.env.TZ || 'America/New_York';
+// Nudge the process clock towards league time so logs read sensibly. This is
+// cosmetic now: when signups actually close is decided by LEAGUE_TZ in util.js,
+// applied explicitly, and no longer depends on the host's timezone at all.
+process.env.TZ = process.env.LEAGUE_TZ || process.env.TZ || 'America/New_York';
 
 const path = require('path');
 const express = require('express');
@@ -24,6 +25,8 @@ app.use((req, res, next) => {
   next();
 });
 app.use(cookieSession({
+  // Internal cookie name — deliberately unchanged by the Blind Doubles rename,
+  // since renaming it would sign the whole league out at once.
   name: 'luckydoubles',
   keys: [sessionSecret()],
   maxAge: 1000 * 60 * 60 * 24 * 90,
@@ -48,7 +51,12 @@ app.use(async (req, res, next) => {
     if (!req.user) req.session = null;
   }
   res.locals.user = req.user;
-  res.locals.title = 'Lucky Doubles';
+  // Bowlers locked out of their account are waiting on an admin, so admins
+  // carry the count in the nav rather than having to go looking for it.
+  res.locals.lockoutCount = req.user && req.user.is_admin
+    ? (await one('SELECT COUNT(*) AS n FROM password_requests WHERE handled_at IS NULL')).n
+    : 0;
+  res.locals.title = 'Blind Doubles';
   res.locals.active = '';
   res.locals.msg = typeof req.query.msg === 'string' ? req.query.msg : null;
   res.locals.err = typeof req.query.err === 'string' ? req.query.err : null;

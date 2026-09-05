@@ -1,4 +1,4 @@
-# Deploying Lucky Doubles
+# Deploying Blind Doubles
 
 The app stores everything in Postgres (`DATABASE_URL`), so it runs two ways:
 
@@ -13,7 +13,7 @@ Environment variables:
 | --- | --- | --- |
 | `DATABASE_URL` | yes | Postgres connection string. Attaching Neon to a Vercel project injects it automatically. |
 | `SESSION_SECRET` | no | Cookie signing key. If unset, a stable one is derived from `DATABASE_URL`. |
-| `TZ` | no | League timezone; defaults to `America/New_York`. |
+| `LEAGUE_TZ` | no | League timezone — decides when signups close. Defaults to `America/New_York`, and is applied explicitly, so a host running in UTC (Vercel does) still closes signups at 6:40 PM at the lanes. |
 | `DATABASE_SSL` | no | Set to `no-verify` only if the DB host's TLS cert can't be verified. |
 
 ---

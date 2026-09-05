@@ -143,9 +143,15 @@ async function buildWeekView(week, viewer) {
       .filter((u) => !signedIds.has(u.id));
   }
 
+  // Standings are ranked by pins; the admin's bulk score sheet wants the teams
+  // in lane order instead.
+  const teamOrder = standings.slice().sort((a, b) => a.number - b.number);
+  const paidCount = signups.filter((s) => s.paid).length;
+
   return {
     week, signups, signupOpen, viewerSignup, oddOut,
-    standings, highlights, waitlist, viewerTeam, allScored, addable,
+    standings, teamOrder, highlights, waitlist, viewerTeam, allScored, addable,
+    paidCount, unpaid: signups.filter((s) => !s.paid),
   };
 }
 

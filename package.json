@@ -1,7 +1,7 @@
 {
   "name": "luckydoubles",
   "version": "2.0.0",
-  "description": "Friday night lucky-draw doubles bowling league — signups, pairings, scores, results",
+  "description": "Friday night blind-draw doubles bowling league — signups, pairings, scores, results",
   "main": "server.js",
   "scripts": {
     "start": "node --env-file-if-exists=.env server.js",

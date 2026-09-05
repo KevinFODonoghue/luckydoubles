@@ -1,4 +1,4 @@
-// Lucky Doubles schema (Postgres). Single source of truth — applied
+// Blind Doubles schema (Postgres). Single source of truth — applied
 // automatically on boot (see db.js) and by `npm run schema`. Idempotent.
 
 const SCHEMA_SQL = `
@@ -52,6 +52,27 @@ CREATE TABLE IF NOT EXISTS scores (
   game2 INTEGER,
   game3 INTEGER,
   UNIQUE (week_id, user_id)
+);
+
+-- A locked-out bowler asks for help from the sign-in page; the admin sees the
+-- request on the Admin page and hands back a temporary password.
+CREATE TABLE IF NOT EXISTS password_requests (
+  id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at BIGINT NOT NULL,
+  handled_at BIGINT,
+  handled_by INTEGER REFERENCES users(id) ON DELETE SET NULL
+);
+
+-- One open request per bowler: asking twice just keeps the first one waiting.
+CREATE UNIQUE INDEX IF NOT EXISTS password_requests_one_open_idx
+  ON password_requests (user_id) WHERE handled_at IS NULL;
+
+-- Bookkeeping for one-time data repairs (see MIGRATIONS in db.js).
+CREATE TABLE IF NOT EXISTS app_meta (
+  key TEXT PRIMARY KEY,
+  value TEXT,
+  created_at BIGINT NOT NULL
 );
 `;
 

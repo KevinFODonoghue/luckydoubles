@@ -26,10 +26,32 @@ const pool = new Pool({
 
 pool.on('error', (err) => console.error('idle client error', err));
 
+const { SCHEMA_SQL } = require('./schema');
+const util = require('./util');
+
+// One-time data repairs, applied in order and recorded in app_meta so they
+// never run twice. Anything that has to reason about league time lives here
+// rather than in SCHEMA_SQL, because the timezone maths is in JavaScript.
+const MIGRATIONS = [
+  // Deadlines used to be stamped in whatever timezone the host ran in. On
+  // Vercel (UTC) that put "6:30 PM" in the early afternoon at the lanes, so
+  // signups closed hours before anyone expected. Re-stamp every week that is
+  // still taking signups with the league's real deadline; past weeks are
+  // history and are left exactly as they were.
+  ['deadline-league-tz-1840', async (client) => {
+    const { rows } = await client.query("SELECT id, date FROM weeks WHERE status = 'open'");
+    for (const week of rows) {
+      const deadline = util.defaultDeadline(week.date);
+      if (deadline !== null) {
+        await client.query('UPDATE weeks SET deadline = $1 WHERE id = $2', [deadline, week.id]);
+      }
+    }
+  }],
+];
+
 // Apply the schema once per process before the first real query. Idempotent,
 // and serialized across concurrent cold starts with a transaction-scoped
 // advisory lock (safe under pooled/transaction-mode connections).
-const { SCHEMA_SQL } = require('./schema');
 let readyPromise = null;
 
 function ready() {
@@ -40,6 +62,15 @@ function ready() {
         await client.query('BEGIN');
         await client.query('SELECT pg_advisory_xact_lock(727454001)');
         await client.query(SCHEMA_SQL);
+        for (const [key, migrate] of MIGRATIONS) {
+          const done = await client.query('SELECT 1 FROM app_meta WHERE key = $1', [key]);
+          if (done.rowCount) continue;
+          await migrate(client);
+          await client.query(
+            'INSERT INTO app_meta (key, value, created_at) VALUES ($1, $2, $3) ON CONFLICT (key) DO NOTHING',
+            [key, 'applied', Date.now()]
+          );
+        }
         await client.query('COMMIT');
       } catch (e) {
         await client.query('ROLLBACK').catch(() => {});
@@ -95,7 +126,9 @@ function isUniqueViolation(e) {
 
 // Session-cookie signing key. Prefer an explicit SESSION_SECRET; otherwise
 // derive a stable one from the database credentials so sessions survive
-// restarts and cold starts with zero configuration.
+// restarts and cold starts with zero configuration. The literal below is part
+// of that derivation — changing it (for the Blind Doubles rename, say) would
+// invalidate every signed-in session, so it stays as it is.
 function sessionSecret() {
   if (process.env.SESSION_SECRET) return process.env.SESSION_SECRET;
   return crypto.createHash('sha256').update('luckydoubles-session|' + DATABASE_URL).digest('hex');

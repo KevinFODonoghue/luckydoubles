@@ -1,4 +1,4 @@
-/* Friday Night Lucky Doubles — dark alley theme */
+/* Friday Night Blind Doubles — dark alley theme */
 
 :root {
   --bg: #0e1116;
@@ -410,6 +410,34 @@ button.tag:hover { border-color: var(--ok); }
 
 /* ---- Admin zone ---- */
 .admin-zone h2 { color: var(--accent); }
+
+.nav-badge {
+  display: inline-block; min-width: 1.15rem; margin-left: 0.35rem; padding: 0 0.3rem;
+  background: var(--bad); color: #1a0606; border-radius: 999px;
+  font-size: 0.72rem; font-weight: 700; text-align: center; line-height: 1.2rem;
+}
+
+.lockout-card { border-color: rgba(251, 191, 36, 0.45); }
+.lockout-card h3 { color: var(--warn); }
+
+/* Check-in list: one tap per bowler as they pay at the desk. */
+.checkin .roster-row { background: var(--card2); }
+.checkin .roster-row.is-paid { border-color: rgba(52, 211, 153, 0.35); }
+.paid-form { display: flex; align-items: center; gap: 0.4rem; margin: 0; }
+.paid-box {
+  display: inline-flex; align-items: center; gap: 0.4rem; cursor: pointer;
+  padding: 0.25rem 0.55rem 0.25rem 0.4rem; border: 1px solid var(--line);
+  border-radius: 999px; font-size: 0.8rem; color: var(--dim); white-space: nowrap;
+}
+.paid-box input { width: 1.05rem; height: 1.05rem; margin: 0; accent-color: var(--ok); cursor: pointer; }
+.paid-box:hover { border-color: #3a4356; }
+.is-paid .paid-box { border-color: rgba(52, 211, 153, 0.4); color: var(--ok); }
+.js .no-js-only { display: none; }
+
+.score-sheet input { width: 4rem; padding: 0.3rem 0.35rem; text-align: center; font-size: 0.9rem; }
+.score-sheet .team-start td { border-top: 1px solid var(--line); }
+.score-sheet tbody tr:first-child td { border-top: none; }
+.score-sheet .series { min-width: 0; }
 
 .danger-card { border-color: rgba(248, 113, 113, 0.4); }
 .danger-card h3 { color: var(--bad); }

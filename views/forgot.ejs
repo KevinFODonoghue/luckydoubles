@@ -1,0 +1,20 @@
+<%- include('partials/header') %>
+
+<div class="lane-glow" aria-hidden="true"></div>
+<div class="auth-card card">
+  <div class="auth-logo">🎳</div>
+  <h1 class="auth-title">Can't get <span class="lucky">in?</span></h1>
+  <p class="auth-sub">
+    Enter the email you registered with. Your league admin gets the request and
+    sends you a temporary password — then you pick a new one under Profile.
+  </p>
+  <form method="post" action="/forgot" class="stack">
+    <label>Email
+      <input type="email" name="email" required autocomplete="email" autofocus>
+    </label>
+    <button type="submit" class="btn btn-primary btn-block">Ask the admin for a reset</button>
+  </form>
+  <p class="auth-alt">Remembered it? <a href="/login">Back to sign in</a></p>
+</div>
+
+<%- include('partials/footer') %>

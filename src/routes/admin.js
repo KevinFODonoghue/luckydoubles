@@ -116,11 +116,49 @@ router.post('/signups/:sid/remove', async (req, res) => {
   util.go(res, back, { msg: `Removed from this week.${note}` });
 });
 
+// The check-in list posts the box's state explicitly (a hidden 0 paired with
+// the checkbox's 1), so ticking twice can't land back where it started.
 router.post('/signups/:sid/paid', async (req, res) => {
   const signup = await one('SELECT * FROM signups WHERE id = $1', [util.toInt(req.params.sid)]);
   if (!signup) return util.go(res, '/', { err: 'That signup no longer exists.' });
-  await run('UPDATE signups SET paid = $1 WHERE id = $2', [signup.paid ? 0 : 1, signup.id]);
-  res.redirect('/week/' + signup.week_id);
+  const wanted = util.lastValue(req.body.paid);
+  const paid = wanted === undefined ? (signup.paid ? 0 : 1) : (String(wanted) === '1' ? 1 : 0);
+  await run('UPDATE signups SET paid = $1 WHERE id = $2', [paid, signup.id]);
+  res.redirect('/week/' + signup.week_id + '#checkin');
+});
+
+// Enter every bowler's three games in one pass — how the admin closes out the
+// night when people have already left or are handing over scraps of paper.
+router.post('/week/:id/scores-all', async (req, res) => {
+  const week = await loadWeek(req, res);
+  if (!week) return;
+  const back = '/week/' + week.id;
+  if (week.status === 'open') return util.go(res, back, { err: 'Generate pairings before entering scores.' });
+
+  const teams = await q('SELECT bowler1_id, bowler2_id FROM teams WHERE week_id = $1 ORDER BY team_number ASC', [week.id]);
+  const bowlerIds = teams.flatMap((t) => [t.bowler1_id, t.bowler2_id]);
+  if (!bowlerIds.length) return util.go(res, back, { err: 'No teams to score yet.' });
+
+  const entries = [];
+  for (const userId of bowlerIds) {
+    const games = [1, 2, 3].map((n) => util.toInt(req.body[`g${n}_${userId}`]));
+    if (!games.every(util.validGame)) {
+      return util.go(res, back, { err: 'Each game must be a whole number between 0 and 300.' });
+    }
+    entries.push({ userId, games });
+  }
+
+  await tx(async (c) => {
+    for (const { userId, games } of entries) {
+      await c.query(`
+        INSERT INTO scores (week_id, user_id, game1, game2, game3) VALUES ($1, $2, $3, $4, $5)
+        ON CONFLICT (week_id, user_id) DO UPDATE SET
+          game1 = EXCLUDED.game1, game2 = EXCLUDED.game2, game3 = EXCLUDED.game3
+      `, [week.id, userId, games[0], games[1], games[2]]);
+    }
+  });
+
+  util.go(res, back, { msg: `Scores saved for all ${bowlerIds.length} bowlers.`, hash: '#scores' });
 });
 
 // ---- Admin panel ----
@@ -135,7 +173,7 @@ router.get('/admin', async (req, res) => {
     ...w,
     bowlerCount: (await one('SELECT COUNT(*) AS n FROM signups WHERE week_id = $1', [w.id])).n,
   })));
-  res.render('admin', { title: 'Admin', active: 'admin', users, weeks });
+  res.render('admin', { title: 'Admin', active: 'admin', users, weeks, lockouts: await openLockouts() });
 });
 
 router.post('/admin/weeks', async (req, res) => {
@@ -179,12 +217,51 @@ router.post('/admin/users/:id/toggle-admin', async (req, res) => {
   util.go(res, '/admin', { msg: `${target.name} is ${target.is_admin ? 'no longer' : 'now'} an admin.` });
 });
 
+// ---- Locked-out bowlers ----
+
+async function openLockouts() {
+  return q(`
+    SELECT r.id, r.created_at, u.id AS user_id, u.name, u.email
+    FROM password_requests r JOIN users u ON u.id = r.user_id
+    WHERE r.handled_at IS NULL
+    ORDER BY r.created_at ASC
+  `);
+}
+
+// Give the bowler a fresh temporary password to sign in with, and close out any
+// help request they raised. They change it themselves under Profile afterwards.
+async function resetPasswordFor(target, adminId) {
+  const temp = crypto.randomBytes(4).toString('hex');
+  await run('UPDATE users SET password_hash = $1 WHERE id = $2', [bcrypt.hashSync(temp, 10), target.id]);
+  await run(
+    'UPDATE password_requests SET handled_at = $1, handled_by = $2 WHERE user_id = $3 AND handled_at IS NULL',
+    [Date.now(), adminId, target.id]
+  );
+  return temp;
+}
+
 router.post('/admin/users/:id/reset-password', async (req, res) => {
   const target = await one('SELECT * FROM users WHERE id = $1', [util.toInt(req.params.id)]);
   if (!target) return util.go(res, '/admin', { err: 'Bowler not found.' });
-  const temp = crypto.randomBytes(4).toString('hex');
-  await run('UPDATE users SET password_hash = $1 WHERE id = $2', [bcrypt.hashSync(temp, 10), target.id]);
-  util.go(res, '/admin', { msg: `Temporary password for ${target.name}: ${temp} — have them change it in Profile.` });
+  const temp = await resetPasswordFor(target, req.user.id);
+  util.go(res, '/admin', { msg: `Temporary password for ${target.name}: ${temp} — send it over, and have them change it in Profile.` });
+});
+
+router.post('/admin/lockouts/:id/reset', async (req, res) => {
+  const request = await one('SELECT * FROM password_requests WHERE id = $1', [util.toInt(req.params.id)]);
+  if (!request) return util.go(res, '/admin', { err: 'That request no longer exists.' });
+  const target = await one('SELECT * FROM users WHERE id = $1', [request.user_id]);
+  if (!target) return util.go(res, '/admin', { err: 'Bowler not found.' });
+  const temp = await resetPasswordFor(target, req.user.id);
+  util.go(res, '/admin', { msg: `Temporary password for ${target.name}: ${temp} — send it over, and have them change it in Profile.` });
+});
+
+router.post('/admin/lockouts/:id/dismiss', async (req, res) => {
+  const request = await one('SELECT * FROM password_requests WHERE id = $1', [util.toInt(req.params.id)]);
+  if (!request) return util.go(res, '/admin', { err: 'That request no longer exists.' });
+  await run('UPDATE password_requests SET handled_at = $1, handled_by = $2 WHERE id = $3',
+    [Date.now(), req.user.id, request.id]);
+  util.go(res, '/admin', { msg: 'Request cleared — no password was changed.' });
 });
 
 // Danger zone: wipe every table for a fresh season / go-live. Requires the
@@ -194,7 +271,7 @@ router.post('/admin/danger/reset', async (req, res) => {
   if (String(req.body.confirm || '').trim().toUpperCase() !== 'RESET') {
     return util.go(res, '/admin', { err: 'Type RESET in the confirmation box to wipe the league.' });
   }
-  await run('TRUNCATE scores, teams, signups, weeks, users RESTART IDENTITY CASCADE');
+  await run('TRUNCATE scores, teams, signups, password_requests, weeks, users RESTART IDENTITY CASCADE');
   req.session = null;
   res.redirect('/register?msg=' + encodeURIComponent('League wiped clean. The first account to register becomes the new admin.'));
 });

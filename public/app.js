@@ -1,3 +1,12 @@
+// Ticking a check-in box saves it straight away — no extra Save tap at the desk.
+// (The `js` class that hides the fallback Save button is set in the page head.)
+document.addEventListener('change', (e) => {
+  const el = e.target.closest('[data-autosubmit]');
+  if (!el || !el.form) return;
+  if (el.form.requestSubmit) el.form.requestSubmit();
+  else el.form.submit();
+});
+
 // Confirm dialogs for destructive actions.
 document.addEventListener('submit', (e) => {
   const form = e.target.closest('form[data-confirm]');

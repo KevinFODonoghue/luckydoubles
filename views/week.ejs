@@ -5,7 +5,7 @@
 <div class="week-head">
   <div>
     <h1><%= h.fmtWeekDate(wk.date) %></h1>
-    <div class="sub">Lucky doubles · 3 games · signups close <%= h.fmtDT(wk.deadline) %></div>
+    <div class="sub">Blind doubles · 3 games · signups close <%= h.fmtDT(wk.deadline) %></div>
   </div>
   <% if (wk.status === 'completed') { %>
     <span class="pill pill-final">Final</span>
@@ -212,57 +212,139 @@
 <% } %>
 
 <%# ---------- Roster ---------- %>
-<section>
-  <h2>Bowlers <span class="count"><%= vm.signups.length %></span>
-    <% if (user && user.is_admin && vm.signups.length) { %>
-    <span class="paid-chip"><%= vm.signups.filter(s => s.paid).length %>/<%= vm.signups.length %> paid</span>
-    <% } %>
-  </h2>
-
-  <% if (wk.status === 'open' && vm.oddOut && vm.signups.length >= 3) { %>
-  <div class="notice">
-    Odd number of bowlers — if it stays this way, <strong><%= vm.oddOut.name %></strong> (last to sign up) goes on the waitlist.
-  </div>
-  <% } %>
-
-  <% if (vm.signups.length === 0) { %>
-    <p class="empty">Nobody has signed up yet<%= vm.signupOpen ? ' — be the first!' : '.' %></p>
-  <% } else { %>
-  <ul class="roster">
-    <% vm.signups.forEach((s, i) => { %>
-    <li class="roster-row <%= user && s.user_id === user.id ? 'me' : '' %>">
-      <span class="ord">#<%= i + 1 %></span>
-      <span class="rname"><%= s.name %><% if (user && s.user_id === user.id) { %> <span class="you">you</span><% } %></span>
-      <span class="ravg">avg <%= s.avg_snapshot !== null ? s.avg_snapshot : (s.average === null ? '—' : s.average) %></span>
-      <% if (wk.status !== 'open' && s.waitlisted) { %><span class="tag tag-warn">waitlist</span><% } %>
-      <% if (user && user.is_admin) { %>
-        <form method="post" action="/signups/<%= s.id %>/paid" class="inline">
-          <button type="submit" class="tag <%= s.paid ? 'tag-ok' : 'tag-dim' %>" title="Click to toggle paid"><%= s.paid ? 'Paid ✓' : 'Unpaid' %></button>
-        </form>
-        <% if (wk.status !== 'completed') { %>
-        <form method="post" action="/signups/<%= s.id %>/remove" class="inline" data-confirm="Remove <%= s.name %> from this week?">
-          <button type="submit" class="xbtn" title="Remove from this week">✕</button>
-        </form>
-        <% } %>
-      <% } else if (user && s.user_id === user.id) { %>
-        <span class="tag <%= s.paid ? 'tag-ok' : 'tag-dim' %>"><%= s.paid ? 'Paid ✓' : 'Pay at desk' %></span>
+<% if (user && user.is_admin) { %>
+  <%# Admins get the check-in sheet: who's in, and a box to tick as each one pays. %>
+  <section class="admin-zone" id="checkin">
+    <h2>Check-in &amp; payments <span class="count"><%= vm.signups.length %> in</span>
+      <% if (vm.signups.length) { %>
+      <span class="paid-chip"><%= vm.paidCount %>/<%= vm.signups.length %> paid</span>
       <% } %>
-    </li>
-    <% }) %>
-  </ul>
-  <% } %>
+    </h2>
 
-  <% if (user && user.is_admin && wk.status !== 'completed' && vm.addable.length) { %>
-  <form method="post" action="/week/<%= wk.id %>/signups/add" class="row-form">
-    <select name="user_id">
-      <% vm.addable.forEach(u => { %>
-      <option value="<%= u.id %>"><%= u.name %> (<%= u.average === null ? 'no avg' : 'avg ' + u.average %>)</option>
+    <% if (wk.status === 'open' && vm.oddOut && vm.signups.length >= 3) { %>
+    <div class="notice">
+      Odd number of bowlers — if it stays this way, <strong><%= vm.oddOut.name %></strong> (last to sign up) goes on the waitlist.
+    </div>
+    <% } %>
+
+    <div class="card">
+      <% if (vm.signups.length === 0) { %>
+        <p class="empty">Nobody has signed up yet<%= vm.signupOpen ? '.' : ' — you can add bowlers below.' %></p>
+      <% } else { %>
+      <ul class="roster checkin">
+        <% vm.signups.forEach((s, i) => { %>
+        <li class="roster-row <%= s.paid ? 'is-paid' : '' %>">
+          <span class="ord">#<%= i + 1 %></span>
+          <span class="rname"><%= s.name %><% if (s.user_id === user.id) { %> <span class="you">you</span><% } %></span>
+          <span class="ravg">avg <%= s.avg_snapshot !== null ? s.avg_snapshot : (s.average === null ? '—' : s.average) %></span>
+          <% if (wk.status !== 'open' && s.waitlisted) { %><span class="tag tag-warn">waitlist</span><% } %>
+          <form method="post" action="/signups/<%= s.id %>/paid" class="paid-form">
+            <input type="hidden" name="paid" value="0">
+            <label class="paid-box">
+              <input type="checkbox" name="paid" value="1" data-autosubmit <%= s.paid ? 'checked' : '' %>
+                     aria-label="<%= s.name %> has paid">
+              <span><%= s.paid ? 'Paid' : 'Not paid' %></span>
+            </label>
+            <button type="submit" class="btn btn-xs no-js-only">Save</button>
+          </form>
+          <% if (wk.status !== 'completed') { %>
+          <form method="post" action="/signups/<%= s.id %>/remove" class="inline" data-confirm="Remove <%= s.name %> from this week?">
+            <button type="submit" class="xbtn" title="Remove from this week">✕</button>
+          </form>
+          <% } %>
+        </li>
+        <% }) %>
+      </ul>
+
+      <p class="hint">
+        <% if (vm.unpaid.length) { %>
+          Still to pay: <strong><%= vm.unpaid.map(s => s.name).join(', ') %></strong>.
+        <% } else { %>
+          Everyone signed up has paid. 💵
+        <% } %>
+      </p>
+      <% } %>
+
+      <% if (wk.status !== 'completed' && vm.addable.length) { %>
+      <form method="post" action="/week/<%= wk.id %>/signups/add" class="row-form">
+        <select name="user_id">
+          <% vm.addable.forEach(u => { %>
+          <option value="<%= u.id %>"><%= u.name %> (<%= u.average === null ? 'no avg' : 'avg ' + u.average %>)</option>
+          <% }) %>
+        </select>
+        <button type="submit" class="btn btn-sm">Add bowler</button>
+      </form>
+      <% } %>
+    </div>
+  </section>
+<% } else { %>
+  <section>
+    <h2>Bowlers <span class="count"><%= vm.signups.length %></span></h2>
+
+    <% if (wk.status === 'open' && vm.oddOut && vm.signups.length >= 3) { %>
+    <div class="notice">
+      Odd number of bowlers — if it stays this way, <strong><%= vm.oddOut.name %></strong> (last to sign up) goes on the waitlist.
+    </div>
+    <% } %>
+
+    <% if (vm.signups.length === 0) { %>
+      <p class="empty">Nobody has signed up yet<%= vm.signupOpen ? ' — be the first!' : '.' %></p>
+    <% } else { %>
+    <ul class="roster">
+      <% vm.signups.forEach((s, i) => { %>
+      <li class="roster-row <%= user && s.user_id === user.id ? 'me' : '' %>">
+        <span class="ord">#<%= i + 1 %></span>
+        <span class="rname"><%= s.name %><% if (user && s.user_id === user.id) { %> <span class="you">you</span><% } %></span>
+        <span class="ravg">avg <%= s.avg_snapshot !== null ? s.avg_snapshot : (s.average === null ? '—' : s.average) %></span>
+        <% if (wk.status !== 'open' && s.waitlisted) { %><span class="tag tag-warn">waitlist</span><% } %>
+        <% if (user && s.user_id === user.id) { %>
+          <span class="tag <%= s.paid ? 'tag-ok' : 'tag-dim' %>"><%= s.paid ? 'Paid ✓' : 'Pay at desk' %></span>
+        <% } %>
+      </li>
       <% }) %>
-    </select>
-    <button type="submit" class="btn btn-sm">Add bowler</button>
-  </form>
-  <% } %>
+    </ul>
+    <% } %>
+  </section>
+<% } %>
+
+<%# ---------- Admin score sheet ---------- %>
+<% if (user && user.is_admin && wk.status !== 'open' && vm.teamOrder.length) { %>
+<section class="admin-zone" id="scores">
+  <h2>Score sheet <span class="count">all <%= vm.teamOrder.length * 2 %> bowlers</span></h2>
+  <div class="card">
+    <p class="hint">For closing out the night yourself — type in whatever scores you have
+    and save the lot in one go. Leave a box empty for a game that wasn't bowled.</p>
+    <form method="post" action="/week/<%= wk.id %>/scores-all">
+      <div class="table-scroll">
+        <table class="table score-sheet">
+          <thead>
+            <tr><th>Team</th><th>Bowler</th><th>G1</th><th>G2</th><th>G3</th><th>Series</th></tr>
+          </thead>
+          <tbody>
+            <% vm.teamOrder.forEach(t => { %>
+              <% t.bowlers.forEach((b, i) => { %>
+              <tr class="<%= i === 0 ? 'team-start' : '' %>">
+                <td class="dim"><%= i === 0 ? '#' + t.number : '' %></td>
+                <td class="stat-name"><%= b.name %></td>
+                <% [0, 1, 2].forEach(g => { %>
+                <td>
+                  <input type="number" name="g<%= g + 1 %>_<%= b.user_id %>" min="0" max="300" inputmode="numeric"
+                         value="<%= b.games[g] === null || b.games[g] === undefined ? '' : b.games[g] %>"
+                         aria-label="<%= b.name %> game <%= g + 1 %>">
+                </td>
+                <% }) %>
+                <td class="series"><%= b.hasAny ? h.fmtNum(b.series) : '—' %></td>
+              </tr>
+              <% }) %>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+      <button type="submit" class="btn btn-primary">Save all scores</button>
+    </form>
+  </div>
 </section>
+<% } %>
 
 <%# ---------- Admin controls ---------- %>
 <% if (user && user.is_admin) { %>
@@ -288,6 +370,7 @@
               data-confirm="Reopen signups? Pairings will be cleared (scores are kept).">
           <button type="submit" class="btn btn-ghost">Reopen signups</button>
         </form>
+        <a href="#scores" class="btn">Enter all scores</a>
       <% } else { %>
         <form method="post" action="/week/<%= wk.id %>/unfinalize"
               data-confirm="Unlock this week so scores can be edited?">
@@ -297,7 +380,7 @@
     </div>
     <% if (wk.status !== 'completed') { %>
     <form method="post" action="/week/<%= wk.id %>/deadline" class="row-form deadline-form">
-      <label>Signup deadline
+      <label>Signup deadline <span class="hint">(league time, <%= h.tzLabel() %>)</span>
         <input type="datetime-local" name="deadline" value="<%= h.toLocalInputValue(wk.deadline) %>">
       </label>
       <button type="submit" class="btn btn-sm">Update</button>

@@ -7,6 +7,40 @@
   </div>
 </div>
 
+<% if (lockouts.length) { %>
+<div class="card lockout-card">
+  <h3>🔑 Locked out <span class="paid-chip"><%= lockouts.length %> waiting</span></h3>
+  <p class="hint">These bowlers asked for help signing in. Reset gives you a temporary
+  password to text them — they change it themselves under Profile.</p>
+  <div class="table-scroll">
+    <table class="table">
+      <thead>
+        <tr><th>Bowler</th><th>Email</th><th>Asked</th><th></th></tr>
+      </thead>
+      <tbody>
+        <% lockouts.forEach(r => { %>
+        <tr>
+          <td class="stat-name"><%= r.name %></td>
+          <td class="dim"><%= r.email %></td>
+          <td class="dim"><%= h.fmtDT(r.created_at) %></td>
+          <td class="t-actions">
+            <form method="post" action="/admin/lockouts/<%= r.id %>/reset" class="inline"
+                  data-confirm="Reset <%= r.name %>'s password? A temporary one will be shown to you.">
+              <button type="submit" class="btn btn-xs btn-primary">Reset &amp; show password</button>
+            </form>
+            <form method="post" action="/admin/lockouts/<%= r.id %>/dismiss" class="inline"
+                  data-confirm="Clear this request without changing <%= r.name %>'s password?">
+              <button type="submit" class="btn btn-xs">Dismiss</button>
+            </form>
+          </td>
+        </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</div>
+<% } %>
+
 <div class="card">
   <h3>Weeks</h3>
   <div class="table-scroll">
@@ -37,7 +71,7 @@
   </div>
   <form method="post" action="/admin/weeks" class="row-form">
     <label>Date <input type="date" name="date" required></label>
-    <label>Deadline <span class="hint">(optional, defaults to 6:30 PM)</span>
+    <label>Deadline <span class="hint">(optional, defaults to 6:40 PM <%= h.tzLabel() %>)</span>
       <input type="datetime-local" name="deadline">
     </label>
     <button type="submit" class="btn btn-sm">Create week</button>

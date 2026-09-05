@@ -14,7 +14,7 @@ async function main() {
     process.exit(1);
   }
 
-  await run('TRUNCATE scores, teams, signups, weeks, users RESTART IDENTITY CASCADE');
+  await run('TRUNCATE scores, teams, signups, password_requests, weeks, users RESTART IDENTITY CASCADE');
   console.log('League data wiped — fresh start.');
   console.log('The first account to register becomes the league admin.');
   await pool.end();

@@ -46,11 +46,42 @@ router.post('/login', async (req, res) => {
   const user = await one('SELECT * FROM users WHERE email = $1', [email]);
   if (!user || !bcrypt.compareSync(password, user.password_hash)) {
     recordFailure(key);
-    return util.go(res, '/login', { err: 'Wrong email or password.' });
+    return util.go(res, '/login', { err: "Wrong email or password. Locked out? Use “Forgot password?” below." });
   }
   failedLogins.delete(key);
   req.session.userId = user.id;
   util.go(res, '/', { msg: `Welcome back, ${user.name}!` });
+});
+
+// ---- Locked out ----
+//
+// The league has no mail server, so a reset link can't be emailed. Instead a
+// bowler raises a request here, it shows up on the admin's Admin page, and the
+// admin hands back a temporary password the same way they'd text anything else.
+
+router.get('/forgot', (req, res) => {
+  if (req.user) return res.redirect('/profile');
+  res.render('forgot', { title: 'Locked out', active: '' });
+});
+
+router.post('/forgot', async (req, res) => {
+  const email = String(req.body.email || '').trim();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return util.go(res, '/forgot', { err: 'Please enter the email address you registered with.' });
+  }
+  const user = await one('SELECT id FROM users WHERE email = $1', [email]);
+  if (user) {
+    try {
+      await run('INSERT INTO password_requests (user_id, created_at) VALUES ($1, $2)', [user.id, Date.now()]);
+    } catch (e) {
+      // A second ask while the first is still open is not an error.
+      if (!isUniqueViolation(e)) throw e;
+    }
+  }
+  // Same answer either way, so this page can't be used to fish for addresses.
+  util.go(res, '/login', {
+    msg: 'Request sent. If that email is registered, your league admin will get you a temporary password — then change it under Profile.',
+  });
 });
 
 router.get('/register', (req, res) => {
@@ -79,7 +110,9 @@ router.post('/register', async (req, res) => {
     userId = inserted.id;
   } catch (e) {
     if (isUniqueViolation(e)) {
-      return util.go(res, '/register', { err: 'That email is already registered. Try signing in.' });
+      return util.go(res, '/register', {
+        err: "That email already has an account. Sign in with it — or use “Forgot password?” if you can't get in.",
+      });
     }
     throw e;
   }
