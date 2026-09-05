@@ -54,8 +54,23 @@ CREATE TABLE IF NOT EXISTS scores (
   UNIQUE (week_id, user_id)
 );
 
--- A locked-out bowler asks for help from the sign-in page; the admin sees the
--- request on the Admin page and hands back a temporary password.
+-- Single-use password reset tokens, emailed to the bowler. Only the SHA-256 of
+-- the token is stored, so a leaked database still can't be used to reset an
+-- account. Rows are kept after use as a short audit trail and swept on expiry.
+CREATE TABLE IF NOT EXISTS password_resets (
+  id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  token_hash TEXT NOT NULL UNIQUE,
+  expires_at BIGINT NOT NULL,
+  created_at BIGINT NOT NULL,
+  used_at BIGINT
+);
+
+CREATE INDEX IF NOT EXISTS password_resets_user_idx ON password_resets (user_id, used_at);
+
+-- Fallback for a bowler whose email no longer reaches them (wrong address on
+-- file, dead mailbox) or when email delivery isn't configured: they ask here,
+-- and the admin hands back a temporary password from the Admin page.
 CREATE TABLE IF NOT EXISTS password_requests (
   id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,

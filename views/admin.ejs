@@ -10,8 +10,9 @@
 <% if (lockouts.length) { %>
 <div class="card lockout-card">
   <h3>🔑 Locked out <span class="paid-chip"><%= lockouts.length %> waiting</span></h3>
-  <p class="hint">These bowlers asked for help signing in. Reset gives you a temporary
-  password to text them — they change it themselves under Profile.</p>
+  <p class="hint">Bowlers normally reset their own password by email. These ones landed
+  here instead — the email bounced, or their address is out of date. Reset gives you a
+  temporary password to pass on; they change it themselves under Profile.</p>
   <div class="table-scroll">
     <table class="table">
       <thead>

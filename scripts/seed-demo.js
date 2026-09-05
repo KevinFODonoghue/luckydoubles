@@ -31,7 +31,7 @@ function guardRemote(action) {
 async function main() {
   guardRemote('wipe and seed');
 
-  await run('TRUNCATE scores, teams, signups, password_requests, weeks, users RESTART IDENTITY CASCADE');
+  await run('TRUNCATE scores, teams, signups, password_requests, password_resets, weeks, users RESTART IDENTITY CASCADE');
 
   const hash = bcrypt.hashSync('demo123', 10);
   const roster = [

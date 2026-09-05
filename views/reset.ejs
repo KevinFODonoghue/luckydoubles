@@ -1,0 +1,20 @@
+<%- include('partials/header') %>
+
+<div class="lane-glow" aria-hidden="true"></div>
+<div class="auth-card card">
+  <div class="auth-logo">🎳</div>
+  <h1 class="auth-title">New <span class="lucky">password</span></h1>
+  <p class="auth-sub">Welcome back, <%= name %> — pick something you'll remember.</p>
+  <form method="post" action="/reset/<%= token %>" class="stack">
+    <label>New password <span class="hint">(6+ characters)</span>
+      <input type="password" name="password" required minlength="6" autocomplete="new-password" autofocus>
+    </label>
+    <label>Confirm new password
+      <input type="password" name="confirm" required minlength="6" autocomplete="new-password">
+    </label>
+    <button type="submit" class="btn btn-primary btn-block">Save and sign in</button>
+  </form>
+  <p class="auth-fine">This link stops working once you use it.</p>
+</div>
+
+<%- include('partials/footer') %>

@@ -14,6 +14,9 @@ Environment variables:
 | `DATABASE_URL` | yes | Postgres connection string. Attaching Neon to a Vercel project injects it automatically. |
 | `SESSION_SECRET` | no | Cookie signing key. If unset, a stable one is derived from `DATABASE_URL`. |
 | `LEAGUE_TZ` | no | League timezone — decides when signups close. Defaults to `America/New_York`, and is applied explicitly, so a host running in UTC (Vercel does) still closes signups at 6:40 PM at the lanes. |
+| `BREVO_API_KEY` | no | Enables emailed password resets. Without it, "Forgot password?" falls back to the admin queue. See [Password reset email](../README.md#password-reset-email). |
+| `MAIL_FROM` | with Brevo | Sender, e.g. `Blind Doubles <league@gmail.com>`. Must be an address verified in Brevo → Senders; no domain of your own required. |
+| `APP_URL` | no | Public origin used to build reset links, e.g. `https://luckydoubles.vercel.app`. Not read from the `Host` header, which can be forged. Falls back to Vercel's production URL. |
 | `DATABASE_SSL` | no | Set to `no-verify` only if the DB host's TLS cert can't be verified. |
 
 ---

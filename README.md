@@ -19,7 +19,7 @@ league calls it, so that's the name on the door.)
 | Admin tracks who paid | The week page gives the admin a **Check-in & payments** section: everyone who's in, a tick box per bowler for who has paid, a running paid count, and a list of who still owes. Bowlers see their own payment status. |
 | Three games, ranked results | Score entry is per game (G1/G2/G3). Standings rank teams by total pins, with high game and high series callouts. A **Stats** page tracks season wins, average per game, high game, and high series per bowler across finalized weeks. |
 | Own login, opt in/out weekly | Every bowler registers once with email + password, then just opts in or out each week. Opting in/out is one tap and allowed any time before the deadline. |
-| Nobody stays locked out | A bowler who can't sign in taps **Forgot password?**. The request lands on the admin's Admin page (with a count badge in the nav), and the admin hands back a temporary password for them to change under Profile. |
+| Nobody stays locked out | A bowler who can't sign in taps **Forgot password?** and gets an emailed reset link — single use, expires in an hour, and signs them straight in once they pick a new password. If email isn't configured or the address bounces, the request falls back to the admin's Admin page (with a count badge in the nav) so they're never stuck. See [Password reset email](#password-reset-email). |
 
 ## Running it
 
@@ -107,6 +107,33 @@ the health check, and backups.
   production); forms are same-site protected; login attempts are throttled.
 - `npm run dev` restarts the server on file changes.
 
+### Password reset email
+
+Reset links are emailed through [Brevo](https://brevo.com) — free tier, 300
+emails a day, and it sends from a **single verified address**, so the league does
+not need to own a domain. Set up once:
+
+1. Create a Brevo account, then **Senders, Domains & Dedicated IPs → Senders →
+   Add a sender** and verify a normal address (a Gmail or Outlook is fine). This
+   is what bowlers will see the email come from.
+2. **SMTP & API → API keys → Generate a new API key.**
+3. Set three environment variables (on Vercel: Project → Settings →
+   Environment Variables), then redeploy:
+
+   | Variable | Example |
+   | --- | --- |
+   | `BREVO_API_KEY` | `xkeysib-…` |
+   | `MAIL_FROM` | `Blind Doubles <league@gmail.com>` — must be the verified sender |
+   | `APP_URL` | `https://luckydoubles.vercel.app` |
+
+`APP_URL` is what reset links point at. It is deliberately not taken from the
+request's `Host` header, which can be forged to mail bowlers a link to someone
+else's site; on Vercel the project's production URL is used automatically if you
+leave it unset.
+
+Leave these unset and nothing breaks — "Forgot password?" simply routes to the
+admin queue instead, and the page says so.
+
 ### Timezones
 
 League time is **`America/New_York`**, and it is computed explicitly rather than
@@ -133,7 +160,9 @@ still taking signups; finished weeks are left as they are.
   mid-night doesn't change the record of how teams were built.
 - **Re-pairing keeps entered game scores** (they belong to the bowler), and
   reopening signups clears teams but keeps the roster.
-- **Password resets go through the admin, not email.** The league has no mail
-  server, so "Forgot password?" raises a request the admin sees and answers with
-  a temporary password. If the league ever gets a mail provider, `POST /forgot`
-  in `src/routes/auth.js` is the one place to hook it in.
+- **Reset tokens are stored hashed.** Only the SHA-256 of a reset token reaches
+  the database, so a leaked backup can't be used to take over an account. Tokens
+  are single use, expire after an hour, and asking for a new link kills the old one.
+- **The admin queue is the fallback, not the front door.** Bowlers reset their own
+  password by email. The Admin page only sees the ones where that failed — no mail
+  provider configured, or an address that no longer reaches them.

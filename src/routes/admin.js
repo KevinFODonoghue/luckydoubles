@@ -271,7 +271,7 @@ router.post('/admin/danger/reset', async (req, res) => {
   if (String(req.body.confirm || '').trim().toUpperCase() !== 'RESET') {
     return util.go(res, '/admin', { err: 'Type RESET in the confirmation box to wipe the league.' });
   }
-  await run('TRUNCATE scores, teams, signups, password_requests, weeks, users RESTART IDENTITY CASCADE');
+  await run('TRUNCATE scores, teams, signups, password_requests, password_resets, weeks, users RESTART IDENTITY CASCADE');
   req.session = null;
   res.redirect('/register?msg=' + encodeURIComponent('League wiped clean. The first account to register becomes the new admin.'));
 });

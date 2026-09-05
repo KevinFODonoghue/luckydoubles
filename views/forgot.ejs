@@ -3,18 +3,27 @@
 <div class="lane-glow" aria-hidden="true"></div>
 <div class="auth-card card">
   <div class="auth-logo">🎳</div>
-  <h1 class="auth-title">Can't get <span class="lucky">in?</span></h1>
+  <h1 class="auth-title">Reset your <span class="lucky">password</span></h1>
   <p class="auth-sub">
-    Enter the email you registered with. Your league admin gets the request and
-    sends you a temporary password — then you pick a new one under Profile.
+    Enter the email you registered with and we'll send you a link to choose a
+    new password. The link works once and expires in an hour.
   </p>
   <form method="post" action="/forgot" class="stack">
     <label>Email
       <input type="email" name="email" required autocomplete="email" autofocus>
     </label>
-    <button type="submit" class="btn btn-primary btn-block">Ask the admin for a reset</button>
+    <button type="submit" class="btn btn-primary btn-block">Email me a reset link</button>
   </form>
   <p class="auth-alt">Remembered it? <a href="/login">Back to sign in</a></p>
+  <p class="auth-fine">
+    <% if (locals.mailOn) { %>
+      Check your spam folder if it doesn't turn up. Wrong email on file? Your
+      league admin can reset it for you.
+    <% } else { %>
+      Email isn't set up on this league yet, so your request goes to the league
+      admin instead — they'll get you a temporary password.
+    <% } %>
+  </p>
 </div>
 
 <%- include('partials/footer') %>
